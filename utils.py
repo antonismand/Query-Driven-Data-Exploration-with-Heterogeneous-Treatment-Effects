@@ -7,11 +7,11 @@ from causalml.inference.tree.plot import plot_causal_tree
 import pandas as pd
 
 
-class Experiment:
+class Data:
     def __init__(self):
-        self.scores = []
+        pass
 
-    def synth_data(self, n=1000, p=10, sigma=3.0, seed=42):
+    def generate(self, n=1000, p=10, sigma=3.0, seed=42):
         np.random.seed(seed)
 
         Y, X, T, tau, _, _ = synthetic_data(
@@ -27,18 +27,19 @@ class Experiment:
         df["id"] = df.index
 
         self.df = pl.DataFrame(df)
-        self.ctx = pl.SQLContext(population=self.df, eager=True)
         return df.describe()
 
-    def execute(self, conditions: str):
-        return self.ctx.execute("select * from population where " + conditions)
+    def execute(self, conditions: str, on="D"):
+        population = self.df if on == "D" else self.q_df
+        ctx = pl.SQLContext(population=population, eager=True)
+        return ctx.execute("select * from population where " + conditions)
 
     def user_condition(self, p: str):
         self.p = p
-        self.p_df = self.execute(p)
+        self.q_df = self.execute(p, on="D")
 
     def calculate_selectivity(self, query: str):
-        return self.ctx.execute(query).shape[0] / self.df.shape[0]
+        return self.execute(query).shape[0] / self.df.shape[0]
 
     def generate_random_condition(self, selectivity_threshold=0.1):
         while True:
@@ -48,36 +49,42 @@ class Experiment:
             cond = "<=" if left else ">"
             full_cond = f"{p} {cond} {threshold}"
 
-            if (
-                self.calculate_selectivity(
-                    f"select * from population where {full_cond}"
-                )
-                > selectivity_threshold
-            ):
+            if self.calculate_selectivity(full_cond) > selectivity_threshold:
+                self.user_condition(full_cond)
+                # print("User condition:", full_cond)
                 return full_cond
 
-    def fit_tree(self, fit_on="D"):
-        self.ctree: CausalTreeRegressor = CausalTreeRegressor(groups_cnt=True)
-        if fit_on == "D":
-            self.ctree.fit(
-                X=self.df[self.feature_names].to_numpy(),
-                y=self.df["outcome"].to_numpy(),
-                treatment=self.df["treatment"].to_numpy(),
-            )
-        else:
-            self.ctree.fit(
-                X=self.p_df[self.feature_names].to_numpy(),
-                y=self.p_df["outcome"].to_numpy(),
-                treatment=self.p_df["treatment"].to_numpy(),
-            )
-            self.ctx = pl.SQLContext(population=self.p_df, eager=True)
 
+class CT:
+    def __init__(
+        self,
+        D: Data,
+        on="D",
+    ):
+        self.scores = []
+        self.D = D
+        self.on = on
+
+        if on == "D":
+            self.df = D.df
+        else:
+            self.df = D.q_df
+
+        self.fit_tree()
+
+    def fit_tree(self):
+        self.ctree: CausalTreeRegressor = CausalTreeRegressor(groups_cnt=True)
+        self.ctree.fit(
+            X=self.df[self.D.feature_names].to_numpy(),
+            y=self.df["outcome"].to_numpy(),
+            treatment=self.df["treatment"].to_numpy(),
+        )
         self.tree = self.ctree.tree_
 
     def plot_tree(self, max_depth=4):
         plt.figure(figsize=(20, 20))
         plot_causal_tree(
-            self.ctree, max_depth=max_depth, feature_names=self.feature_names
+            self.ctree, max_depth=max_depth, feature_names=self.D.feature_names
         )
 
     def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
@@ -106,8 +113,8 @@ class Experiment:
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
-            df2 = self.execute(full_condition)
-            distance = round(self.jaccard_distance(self.p_df, df2), 2)
+            df2 = self.D.execute(full_condition, on=self.on)
+            distance = round(self.jaccard_distance(self.D.q_df, df2), 2)
 
             print(
                 f"{depth * '  '}{full_condition},  CATE: {cate}, distance: {distance}"
