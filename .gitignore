@@ -1,6 +1,5 @@
-/.DS_Store
+.DS_Store
 /.venv
 /__pycache__
 /datasets
 /evaluation.ipynb
-/framework_examples
