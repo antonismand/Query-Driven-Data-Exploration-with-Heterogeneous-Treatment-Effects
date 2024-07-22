@@ -1,7 +1,6 @@
 /.DS_Store
 /.venv
 /__pycache__
-/benchmarks
 /datasets
 /evaluation.ipynb
 /framework_examples
