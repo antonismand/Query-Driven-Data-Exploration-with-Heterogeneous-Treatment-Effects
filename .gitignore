@@ -1,13 +1,10 @@
 /.DS_Store
 /.venv
-/CT.ipynb
 /CT_new.ipynb
 /CT_old.ipynb
-/README.md
 /__pycache__
 /benchmarks
 /datasets
 /evaluation.ipynb
 /framework_examples
-/utils.py
 /utils_new.py
