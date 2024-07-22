@@ -99,34 +99,36 @@ class CT:
                 depth + 1,
             )
 
-    def get_topK(self, w=0.6, k=5):
+    def get_topK(self, w=0.6, k=5, print_summaries=True):
         scores = pd.DataFrame(self.scores)
         scores["norm_cate"] = scores["cate"] / scores["cate"].max()
         scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
+        scores["algorithm"] = "CT on " + self.on
 
         top = scores.sort_values("score", ascending=False).head(k)
 
-        print(
-            "Score mean:",
-            round(top["score"].mean(), 2),
-            "±",
-            round(top["score"].std(), 2),
-        )
+        if print_summaries:
+            print(
+                "Score mean:",
+                round(top["score"].mean(), 2),
+                "±",
+                round(top["score"].std(), 2),
+            )
 
-        print(
-            "CATE mean:",
-            round(top["cate"].mean(), 2),
-            "±",
-            round(top["cate"].std(), 2),
-        )
+            print(
+                "CATE mean:",
+                round(top["cate"].mean(), 2),
+                "±",
+                round(top["cate"].std(), 2),
+            )
 
-        print(
-            "Distance mean:",
-            round(top["distance"].mean(), 2),
-            "±",
-            round(top["distance"].std(), 2),
-        )
+            print(
+                "Distance mean:",
+                round(top["distance"].mean(), 2),
+                "±",
+                round(top["distance"].std(), 2),
+            )
 
-        print("Depth:", round(top["depth"].mean(), 1))
+            print("Depth:", round(top["depth"].mean(), 1))
 
         return top
