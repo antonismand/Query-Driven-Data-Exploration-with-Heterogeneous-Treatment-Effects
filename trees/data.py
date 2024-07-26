@@ -38,7 +38,7 @@ class Data:
     def calculate_selectivity(self, query: str):
         return self.execute(query).shape[0] / self.df.shape[0]
 
-    def generate_random_condition(self, selectivity_threshold=0.1):
+    def generate_random_condition(self, selectivity_threshold=0.3):
         while True:
             p = np.random.choice(self.feature_names)
             threshold = np.random.uniform(self.df[p].min(), self.df[p].max())

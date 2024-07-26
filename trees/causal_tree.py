@@ -43,7 +43,7 @@ class CT:
         union = df1.shape[0] + df2.shape[0] - intersection
         return intersection / union
 
-    def print_tree(
+    def parse_tree(
         self,
         node_id=0,
         parent_id=None,
@@ -51,6 +51,7 @@ class CT:
         prev_conditions="",
         depth=0,
         max_depth=4,
+        print_tree=False,
     ):
 
         cate = round(self.tree.value[node_id][1][0] - self.tree.value[node_id][0][0], 3)
@@ -67,9 +68,10 @@ class CT:
             df2 = self.D.execute(full_condition, on=self.on)
             distance = round(self.jaccard_distance(self.D.q_df, df2), 2)
 
-            print(
-                f"{depth * '  '}{full_condition},  CATE: {cate}, distance: {distance}"
-            )
+            if print_tree:
+                print(
+                    f"{depth * '  '}{full_condition},  CATE: {cate}, distance: {distance}"
+                )
             self.scores.append(
                 {
                     "condition": full_condition,
@@ -81,22 +83,27 @@ class CT:
                 }
             )
         else:
-            print(f"Root CATE: {cate}")
+            if print_tree:
+                print(f"Root CATE: {cate}")
 
         if self.tree.children_left[node_id] != -1 and depth < max_depth:
-            self.print_tree(
-                self.tree.children_left[node_id],
-                node_id,
-                True,
-                full_condition,
-                depth + 1,
+            self.parse_tree(
+                node_id=self.tree.children_left[node_id],
+                parent_id=node_id,
+                left=True,
+                prev_conditions=full_condition,
+                depth=depth + 1,
+                max_depth=max_depth,
+                print_tree=print_tree,
             )
-            self.print_tree(
-                self.tree.children_right[node_id],
-                node_id,
-                False,
-                full_condition,
-                depth + 1,
+            self.parse_tree(
+                node_id=self.tree.children_right[node_id],
+                parent_id=node_id,
+                left=False,
+                prev_conditions=full_condition,
+                depth=depth + 1,
+                max_depth=max_depth,
+                print_tree=print_tree,
             )
 
     def get_topK(self, w=0.6, k=5, print_summaries=True):
