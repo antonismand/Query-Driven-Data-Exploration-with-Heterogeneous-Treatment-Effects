@@ -1,4 +1,3 @@
-import polars as pl
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
@@ -38,11 +37,6 @@ class CT:
             self.ctree, max_depth=max_depth, feature_names=self.D.feature_names
         )
 
-    def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
-        intersection = df1.join(df2, how="inner", on="id").shape[0]
-        union = df1.shape[0] + df2.shape[0] - intersection
-        return intersection / union
-
     def parse_tree(
         self,
         node_id=0,
@@ -66,7 +60,7 @@ class CT:
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
             df2 = self.D.execute(full_condition, on=self.on)
-            distance = round(self.jaccard_distance(self.D.q_df, df2), 2)
+            distance = round(self.D.jaccard_distance(self.D.q_df, df2), 2)
 
             if print_tree:
                 print(
@@ -75,7 +69,7 @@ class CT:
             self.scores.append(
                 {
                     "condition": full_condition,
-                    "cate": abs(cate),
+                    "t_est": abs(cate),
                     "distance": distance,
                     "T0": self.tree.value[node_id][0][0],
                     "T1": self.tree.value[node_id][1][0],
@@ -84,7 +78,7 @@ class CT:
             )
         else:
             if print_tree:
-                print(f"Root CATE: {cate}")
+                print(rf"Root $\hat{{\tau}}(x)$: {cate}")
 
         if self.tree.children_left[node_id] != -1 and depth < max_depth:
             self.parse_tree(
@@ -108,11 +102,14 @@ class CT:
 
     def get_topK(self, w=0.6, k=5, print_summaries=True):
         scores = pd.DataFrame(self.scores)
-        scores["norm_cate"] = scores["cate"] / scores["cate"].max()
+        scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
         scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
         scores["algorithm"] = "CT on " + self.on
 
         top = scores.sort_values("score", ascending=False).head(k)
+
+        for i, row in top.iterrows():
+            top.loc[i, "t"] = self.D.CATE(row["condition"])
 
         if print_summaries:
             print(
@@ -123,10 +120,16 @@ class CT:
             )
 
             print(
-                "CATE mean:",
-                round(top["cate"].mean(), 2),
+                "Estimated CATE mean:",
+                round(top["t_est"].mean(), 2),
                 "±",
-                round(top["cate"].std(), 2),
+                round(top["t_est"].std(), 2),
+            )
+            print(
+                "True CATE mean:",
+                round(top["t"].mean(), 2),
+                "±",
+                round(top["t"].std(), 2),
             )
 
             print(

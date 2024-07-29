@@ -31,6 +31,15 @@ class Data:
         ctx = pl.SQLContext(population=population, eager=True)
         return ctx.execute("select * from population where " + conditions)
 
+    def CATE(self, condition: str):
+        ctx = pl.SQLContext(population=self.df, eager=True)
+        return round(
+            ctx.execute("select Abs(AVG(ITE)) from population where " + condition)[
+                "ITE"
+            ][0],
+            3,
+        )
+
     def user_condition(self, p: str):
         self.p = p
         self.q_df = self.execute(p, on="D")
@@ -50,3 +59,8 @@ class Data:
                 self.user_condition(full_cond)
                 # print("User condition:", full_cond)
                 return full_cond
+
+    def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
+        intersection = df1.join(df2, how="inner", on="id").shape[0]
+        union = df1.shape[0] + df2.shape[0] - intersection
+        return intersection / union
