@@ -4,6 +4,8 @@ from trees.data import Data
 from time import time
 from econml.cate_interpreter import SingleTreeCateInterpreter
 import matplotlib.pyplot as plt
+from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
+from sklearn.ensemble import RandomForestClassifier
 
 
 class CF:
@@ -14,23 +16,27 @@ class CF:
 
         # self.fit()
 
-    def fit(self, criterion="mse", n_estimators=100):
+    def fit(self, criterion="mse", n_estimators=100, tune=False):
         self.label = f"CF ({criterion})"
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
             discrete_treatment=True,
             random_state=123,
+            model_t=RandomForestClassifier(),
+            model_y=WeightedLassoCVWrapper(),
         )
 
-        # measure execution time
         start = time()
 
-        self.forest.tune(
-            X=self.df[self.D.feature_names].to_numpy(),
-            Y=self.df["outcome"].to_numpy(),
-            T=self.df["treatment"].to_numpy(),
-        )
+        if tune:
+            self.forest.tune(
+                X=self.df[self.D.feature_names].to_numpy(),
+                Y=self.df["outcome"].to_numpy(),
+                T=self.df["treatment"].to_numpy(),
+            )
+            self.label += f" (tuned)"
+
         self.forest.fit(
             X=self.df[self.D.feature_names].to_numpy(),
             Y=self.df["outcome"].to_numpy(),
