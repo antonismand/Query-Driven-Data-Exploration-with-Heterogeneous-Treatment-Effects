@@ -23,7 +23,7 @@ class CT:
         self.algorithm = "CT on " + self.on
         # self.fit()
 
-    def fit(self, max_depth=6):
+    def fit(self, max_depth=4):
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth
         )

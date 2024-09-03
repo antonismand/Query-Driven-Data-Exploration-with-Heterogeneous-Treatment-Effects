@@ -16,7 +16,7 @@ class CF:
 
         # self.fit()
 
-    def fit(self, criterion="mse", n_estimators=100, tune=False, max_depth=6):
+    def fit(self, criterion="mse", n_estimators=100, tune=False, max_depth=4):
         self.algorithm = f"CF ({criterion})"
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
