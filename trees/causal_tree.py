@@ -20,10 +20,13 @@ class CT:
         else:
             self.df = D.q_df
 
-        self.fit_tree()
+        self.algorithm = "CT on " + self.on
+        # self.fit()
 
-    def fit_tree(self):
-        self.ctree: CausalTreeRegressor = CausalTreeRegressor(groups_cnt=True)
+    def fit(self, max_depth=6):
+        self.ctree: CausalTreeRegressor = CausalTreeRegressor(
+            groups_cnt=True, max_depth=max_depth
+        )
         self.ctree.fit(
             X=self.df[self.D.feature_names].to_numpy(),
             y=self.df["outcome"].to_numpy(),
@@ -44,7 +47,7 @@ class CT:
         left=False,
         prev_conditions="",
         depth=0,
-        max_depth=4,
+        max_depth=10,
         print_tree=False,
     ):
 
@@ -101,44 +104,8 @@ class CT:
             )
 
     def get_topK(self, w=0.6, k=5, print_summaries=True):
-        scores = pd.DataFrame(self.scores)
-        scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
-        scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
-        scores["algorithm"] = "CT on " + self.on
+        top = self.D.get_topK(self.scores, w=w, k=k, print_summaries=print_summaries)
 
-        top = scores.sort_values("score", ascending=False).head(k)
-
-        for i, row in top.iterrows():
-            top.loc[i, "t"] = self.D.CATE(row["condition"])
-
-        if print_summaries:
-            print(
-                "Score mean:",
-                round(top["score"].mean(), 2),
-                "±",
-                round(top["score"].std(), 2),
-            )
-
-            print(
-                "Estimated CATE mean:",
-                round(top["t_est"].mean(), 2),
-                "±",
-                round(top["t_est"].std(), 2),
-            )
-            print(
-                "True CATE mean:",
-                round(top["t"].mean(), 2),
-                "±",
-                round(top["t"].std(), 2),
-            )
-
-            print(
-                "Distance mean:",
-                round(top["distance"].mean(), 2),
-                "±",
-                round(top["distance"].std(), 2),
-            )
-
-            print("Depth:", round(top["depth"].mean(), 1))
+        top["algorithm"] = self.algorithm
 
         return top

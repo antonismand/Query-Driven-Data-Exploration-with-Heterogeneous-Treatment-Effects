@@ -16,8 +16,8 @@ class CF:
 
         # self.fit()
 
-    def fit(self, criterion="mse", n_estimators=100, tune=False):
-        self.label = f"CF ({criterion})"
+    def fit(self, criterion="mse", n_estimators=100, tune=False, max_depth=6):
+        self.algorithm = f"CF ({criterion})"
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
@@ -25,9 +25,8 @@ class CF:
             random_state=123,
             model_t=RandomForestClassifier(),
             model_y=WeightedLassoCVWrapper(),
+            max_depth=max_depth,
         )
-
-        start = time()
 
         if tune:
             self.forest.tune(
@@ -35,25 +34,27 @@ class CF:
                 Y=self.df["outcome"].to_numpy(),
                 T=self.df["treatment"].to_numpy(),
             )
-            self.label += f" (tuned)"
+            self.algorithm += f" (tuned)"
 
         self.forest.fit(
             X=self.df[self.D.feature_names].to_numpy(),
             Y=self.df["outcome"].to_numpy(),
             T=self.df["treatment"].to_numpy(),
         )
-        end = time()
-        self.execution_time = round(end - start, 2)
 
-    def parse_forest(self):
+    def parse_forest(self, max_depth=10):
+        start = time()
         self.scores = []
         for tree in self.forest.model_cate.estimators_[0]:
-            self.parse_tree(tree.tree_)
+            self.parse_tree(tree.tree_, max_depth=max_depth)
+        end = time()
+        self.execution_time = round(end - start, 2)
 
     def single_tree_interpreter(
         self, max_depth=4, min_samples_leaf=10, print_tree=False
     ):
-        self.label += " SingleTree"
+        self.algorithm += " SingleTree"
+        start = time()
         intrp = SingleTreeCateInterpreter(
             include_model_uncertainty=True,
             max_depth=max_depth,
@@ -67,6 +68,8 @@ class CF:
 
         self.scores = []
         self.parse_tree(intrp.tree_model_.tree_)
+        end = time()
+        self.execution_time = round(end - start, 2)
 
     def parse_tree(
         self,
@@ -95,7 +98,7 @@ class CF:
 
             add_the_new = True
 
-            if "SingleTree" not in self.label:
+            if "SingleTree" not in self.algorithm:
                 for score in self.scores:  # search for duplicates
                     if abs(score["distance"] - distance) < 0.01:  # same distance from Q
                         df_similar = self.D.execute(score["condition"], on="D")
@@ -142,45 +145,9 @@ class CF:
             )
 
     def get_topK(self, w=0.6, k=5, print_summaries=True):
-        scores = pd.DataFrame(self.scores)
-        scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
-        scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
-        scores["algorithm"] = self.label
-        scores["execution_time"] = self.execution_time
+        top = self.D.get_topK(self.scores, w=w, k=k, print_summaries=print_summaries)
 
-        top = scores.sort_values("score", ascending=False).head(k)
-
-        for i, row in top.iterrows():
-            top.loc[i, "t"] = self.D.CATE(row["condition"])
-
-        if print_summaries:
-            print(
-                "Score mean:",
-                round(top["score"].mean(), 2),
-                "±",
-                round(top["score"].std(), 2),
-            )
-
-            print(
-                "Estimated CATE mean:",
-                round(top["t_est"].mean(), 2),
-                "±",
-                round(top["t_est"].std(), 2),
-            )
-            print(
-                "True CATE mean:",
-                round(top["t"].mean(), 2),
-                "±",
-                round(top["t"].std(), 2),
-            )
-
-            print(
-                "Distance mean:",
-                round(top["distance"].mean(), 2),
-                "±",
-                round(top["distance"].std(), 2),
-            )
-
-            print("Depth:", round(top["depth"].mean(), 1))
+        top["algorithm"] = self.algorithm
+        top["execution_time"] = self.execution_time
 
         return top

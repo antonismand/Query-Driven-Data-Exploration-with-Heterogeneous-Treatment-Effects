@@ -47,7 +47,7 @@ class Data:
     def calculate_selectivity(self, query: str):
         return self.execute(query).shape[0] / self.df.shape[0]
 
-    def generate_random_condition(self, selectivity_threshold=0.3):
+    def generate_random_condition(self, min_s=0.3, max_s=0.95):
         while True:
             p = np.random.choice(self.feature_names)
             threshold = np.random.uniform(self.df[p].min(), self.df[p].max())
@@ -55,12 +55,66 @@ class Data:
             cond = "<=" if left else ">"
             full_cond = f"{p} {cond} {threshold}"
 
-            if self.calculate_selectivity(full_cond) > selectivity_threshold:
+            s = self.calculate_selectivity(full_cond)
+
+            if s > min_s and s < max_s:
                 self.user_condition(full_cond)
-                # print("User condition:", full_cond)
-                return full_cond
+                # print("User condition:", full_cond, "Selectivity:", s)
+                return full_cond, s
 
     def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         union = df1.shape[0] + df2.shape[0] - intersection
         return intersection / union
+
+    def get_topK(self, scores, w=0.6, k=5, print_summaries=True):
+        scores = pd.DataFrame(scores)
+        scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
+        scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
+
+        top = scores.sort_values("score", ascending=False).head(k)
+
+        for i, row in top.iterrows():
+            top.loc[i, "t"] = self.CATE(row["condition"])
+
+        best_t = top["t"].max()
+        top["true_score"] = w * top["t"] / best_t + (1 - w) * top["distance"]
+
+        if print_summaries:
+            print(
+                "Score mean:",
+                round(top["score"].mean(), 2),
+                "±",
+                round(top["score"].std(), 2),
+            )
+
+            print(
+                "True Score mean:",
+                round(top["true_score"].mean(), 2),
+                "±",
+                round(top["true_score"].std(), 2),
+            )
+
+            print(
+                "Estimated CATE mean:",
+                round(top["t_est"].mean(), 2),
+                "±",
+                round(top["t_est"].std(), 2),
+            )
+            print(
+                "True CATE mean:",
+                round(top["t"].mean(), 2),
+                "±",
+                round(top["t"].std(), 2),
+            )
+
+            print(
+                "Distance mean:",
+                round(top["distance"].mean(), 2),
+                "±",
+                round(top["distance"].std(), 2),
+            )
+
+            print("Depth:", round(top["depth"].mean(), 1))
+
+        return top
