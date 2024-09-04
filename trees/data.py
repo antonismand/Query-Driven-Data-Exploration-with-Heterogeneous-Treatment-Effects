@@ -76,6 +76,9 @@ class Data:
 
         for i, row in top.iterrows():
             top.loc[i, "t"] = self.CATE(row["condition"])
+            top.loc[i, "features"] = len(
+                set(row["condition"].split()) & set(self.feature_names)
+            )
 
         best_t = top["t"].max()
         top["true_score"] = w * top["t"] / best_t + (1 - w) * top["distance"]
