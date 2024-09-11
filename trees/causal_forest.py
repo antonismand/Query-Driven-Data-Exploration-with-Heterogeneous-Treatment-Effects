@@ -16,7 +16,7 @@ class CF:
 
         # self.fit()
 
-    def fit(self, criterion="mse", n_estimators=100, tune=False, max_depth=4):
+    def fit(self, criterion="mse", n_estimators=100, tune=False, max_depth=4, cv=2):
         self.algorithm = f"CF ({criterion})"
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
@@ -26,6 +26,7 @@ class CF:
             model_t=RandomForestClassifier(),
             model_y=WeightedLassoCVWrapper(),
             max_depth=max_depth,
+            cv=cv,
         )
 
         if tune:

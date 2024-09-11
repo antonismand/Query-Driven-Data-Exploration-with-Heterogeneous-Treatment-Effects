@@ -8,11 +8,11 @@ class Data:
     def __init__(self):
         pass
 
-    def generate(self, n=1000, p=10, sigma=3.0, seed=42):
+    def generate(self, n=10000, p=10, sigma=3.0, seed=42, mode=2):
         np.random.seed(seed)
 
         Y, X, T, tau, _, _ = synthetic_data(
-            mode=2, n=n, p=p, sigma=sigma
+            mode=mode, n=n, p=p, sigma=sigma
         )  # Simulate randomized trial: mode=2
 
         df = pd.DataFrame(X)

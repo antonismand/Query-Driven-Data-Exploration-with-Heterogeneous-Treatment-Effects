@@ -23,7 +23,7 @@ class CT:
         self.algorithm = "CT on " + self.on
         # self.fit()
 
-    def fit(self, max_depth=4):
+    def fit(self, max_depth=6):
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth
         )
@@ -34,7 +34,9 @@ class CT:
         )
         self.tree = self.ctree.tree_
 
-    def plot_tree(self, max_depth=4):
+        self.parse_tree()
+
+    def plot_tree(self, max_depth=6):
         plt.figure(figsize=(20, 20))
         plot_causal_tree(
             self.ctree, max_depth=max_depth, feature_names=self.D.feature_names
@@ -103,7 +105,7 @@ class CT:
                 print_tree=print_tree,
             )
 
-    def get_topK(self, w=0.6, k=5, print_summaries=True):
+    def get_topK(self, w=0.6, k=5, print_summaries=False):
         top = self.D.get_topK(self.scores, w=w, k=k, print_summaries=print_summaries)
 
         top["algorithm"] = self.algorithm
