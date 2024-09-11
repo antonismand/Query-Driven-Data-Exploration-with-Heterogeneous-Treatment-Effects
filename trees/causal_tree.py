@@ -76,8 +76,8 @@ class CT:
                     "condition": full_condition,
                     "t_est": abs(cate),
                     "distance": distance,
-                    "T0": self.tree.value[node_id][0][0],
-                    "T1": self.tree.value[node_id][1][0],
+                    "T0": round(self.tree.value[node_id][0][0], 2),
+                    "T1": round(self.tree.value[node_id][1][0], 2),
                     "depth": depth,
                 }
             )

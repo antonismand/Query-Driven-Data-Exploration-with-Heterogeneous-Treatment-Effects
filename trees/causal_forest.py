@@ -1,5 +1,6 @@
 from econml.dml import CausalForestDML
 import pandas as pd
+from tqdm import tqdm
 from trees.data import Data
 from time import time
 from econml.cate_interpreter import SingleTreeCateInterpreter
@@ -13,11 +14,19 @@ class CF:
         self.scores = []
         self.D = D
         self.df = D.df
+        self.algorithm = "CF"
 
-        # self.fit()
+    def fit(
+        self,
+        criterion="mse",
+        n_estimators=100,
+        tune=False,
+        max_depth=4,
+        cv=2,
+        min_samples_split=10,
+        min_samples_leaf=5,
+    ):
 
-    def fit(self, criterion="mse", n_estimators=100, tune=False, max_depth=4, cv=2):
-        self.algorithm = f"CF ({criterion})"
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
@@ -27,7 +36,12 @@ class CF:
             model_y=WeightedLassoCVWrapper(),
             max_depth=max_depth,
             cv=cv,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
         )
+        # print(
+        #     f"n_estimators: {n_estimators}, criterion: {criterion}, max_depth: {max_depth}, cv: {cv}, min_samples_split: {min_samples_split}, min_samples_leaf: {min_samples_leaf}"
+        # )
 
         if tune:
             self.forest.tune(
@@ -43,32 +57,13 @@ class CF:
             T=self.df["treatment"].to_numpy(),
         )
 
+        self.parse_forest()
+
     def parse_forest(self, max_depth=10):
         start = time()
         self.scores = []
         for tree in self.forest.model_cate.estimators_[0]:
             self.parse_tree(tree.tree_, max_depth=max_depth)
-        end = time()
-        self.execution_time = round(end - start, 2)
-
-    def single_tree_interpreter(
-        self, max_depth=4, min_samples_leaf=10, print_tree=False
-    ):
-        self.algorithm += " SingleTree"
-        start = time()
-        intrp = SingleTreeCateInterpreter(
-            include_model_uncertainty=True,
-            max_depth=max_depth,
-            min_samples_leaf=min_samples_leaf,
-        )
-        intrp.interpret(self.forest, self.df[self.D.feature_names].to_numpy())
-
-        if print_tree:
-            plt.figure(figsize=(25, 5))
-            intrp.plot(feature_names=self.D.feature_names, fontsize=12)
-
-        self.scores = []
-        self.parse_tree(intrp.tree_model_.tree_)
         end = time()
         self.execution_time = round(end - start, 2)
 
@@ -145,10 +140,63 @@ class CF:
                 max_depth=max_depth,
             )
 
-    def get_topK(self, w=0.6, k=5, print_summaries=True):
+    def get_topK(self, w=0.6, k=5, print_summaries=False):
         top = self.D.get_topK(self.scores, w=w, k=k, print_summaries=print_summaries)
 
         top["algorithm"] = self.algorithm
         top["execution_time"] = self.execution_time
 
         return top
+
+
+class CFT(CF):
+    def __init__(self, cf: CF):
+        self.scores = []
+        self.df = cf.df
+        self.D = cf.D
+        self.cf = cf
+
+        self.algorithm = "CF SingleTree"
+
+    def fit(self, max_depth=4, min_samples_leaf=10, print_tree=False):
+
+        start = time()
+        intrp = SingleTreeCateInterpreter(
+            include_model_uncertainty=True,
+            max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,
+        )
+        intrp.interpret(self.cf.forest, self.df[self.D.feature_names].to_numpy())
+
+        if print_tree:
+            plt.figure(figsize=(25, 5))
+            intrp.plot(feature_names=self.D.feature_names, fontsize=12)
+
+        self.parse_tree(intrp.tree_model_.tree_)
+        end = time()
+        self.execution_time = round(end - start, 2)
+
+
+def parameter_tuning(param_name, param_values, iterations=10):
+    from trees.experiment import plots
+
+    scores = pd.DataFrame()
+    for p in param_values:
+        print(f"{param_name}: {p}")
+        for exp in tqdm(range(iterations)):
+            data = Data()
+            data.generate(seed=exp)
+            data.generate_random_condition()
+
+            cf = CF(data)
+            cf.fit(**{param_name: p})
+
+            cft = CFT(cf)
+            cft.fit()
+
+            for alg in [cf, cft]:
+                score = alg.get_topK()
+                score[param_name] = p
+                scores = pd.concat([scores, score], ignore_index=True)
+
+    plots(param_name, scores)

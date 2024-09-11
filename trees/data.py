@@ -83,6 +83,11 @@ class Data:
         best_t = top["t"].max()
         top["true_score"] = w * top["t"] / best_t + (1 - w) * top["distance"]
 
+        # rounding
+        top["true_score"] = top["true_score"].apply(lambda x: round(x, 2))
+        top["score"] = top["score"].apply(lambda x: round(x, 2))
+        top["norm_cate"] = top["norm_cate"].apply(lambda x: round(x, 2))
+
         if print_summaries:
             print(
                 "Score mean:",
