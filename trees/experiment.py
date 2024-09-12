@@ -22,19 +22,27 @@ class Experiment:
         w=[0.6],
         k=[5],
         iterations=30,
+        override_p_with_2=[False],
     ):
         scores = pd.DataFrame()
 
-        data_params = [mode, n, p, sigma, s_min, s_max]
+        data_params = [mode, n, p, sigma, s_min, s_max, override_p_with_2]
         get_params = [k, w]
 
-        for mode, n, p, sigma, s_min, s_max in product(*data_params):
+        for mode, n, p, sigma, s_min, s_max, override_p_with_2 in product(*data_params):
             print(
                 f"Running {iterations} iterations for mode={mode}, n={n}, p={p}, sigma={sigma}, s_min={s_min}, s_max={s_max}"
             )
             for exp in tqdm(range(iterations)):
                 data = Data()
-                data.generate(n=n, p=p, sigma=sigma, mode=mode, seed=exp)
+                data.generate(
+                    n=n,
+                    p=p,
+                    sigma=sigma,
+                    mode=mode,
+                    seed=exp,
+                    override_p_with_2=override_p_with_2,
+                )
                 data.generate_random_condition(min_s=s_min, max_s=s_max)
 
                 cf = CF(data)

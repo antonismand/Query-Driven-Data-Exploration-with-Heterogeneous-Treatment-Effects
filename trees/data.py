@@ -8,7 +8,9 @@ class Data:
     def __init__(self):
         pass
 
-    def generate(self, n=10000, p=10, sigma=3.0, seed=42, mode=2):
+    def generate(
+        self, n=10000, p=10, sigma=3.0, seed=42, mode=2, override_p_with_2=False
+    ):
         np.random.seed(seed)
 
         Y, X, T, tau, _, _ = synthetic_data(
@@ -22,6 +24,10 @@ class Data:
         df["treatment"] = T
         df["ITE"] = tau
         df["id"] = df.index
+
+        if override_p_with_2:
+            self.feature_names = ["feature_0", "feature_1"]
+            df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
 
         self.df = pl.DataFrame(df)
         return df.describe()
