@@ -23,6 +23,8 @@ tqdm = "^4.66.4"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.4"
+nbconvert = "^7.16.4"
+notebook = "^7.2.2"
 
 [build-system]
 requires = ["poetry-core"]
