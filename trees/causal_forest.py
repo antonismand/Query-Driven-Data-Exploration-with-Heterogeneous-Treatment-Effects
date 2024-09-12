@@ -91,7 +91,7 @@ class CF:
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
             df2 = self.D.execute(full_condition, on="D")
-            distance = round(self.D.jaccard_distance(self.D.q_df, df2), 2)
+            distance = round(self.D.jaccard_distance(self.D.q_df, df2), 3)
 
             add_the_new = True
 
