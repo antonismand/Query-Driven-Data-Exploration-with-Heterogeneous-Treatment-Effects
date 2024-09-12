@@ -25,6 +25,7 @@ class CF:
         cv=2,
         min_samples_split=10,
         min_samples_leaf=5,
+        max_features="auto",
     ):
 
         self.forest: CausalForestDML = CausalForestDML(
@@ -38,6 +39,7 @@ class CF:
             cv=cv,
             min_samples_split=min_samples_split,
             min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
         )
         # print(
         #     f"n_estimators: {n_estimators}, criterion: {criterion}, max_depth: {max_depth}, cv: {cv}, min_samples_split: {min_samples_split}, min_samples_leaf: {min_samples_leaf}"
@@ -49,7 +51,6 @@ class CF:
                 Y=self.df["outcome"].to_numpy(),
                 T=self.df["treatment"].to_numpy(),
             )
-            self.algorithm += f" (tuned)"
 
         self.forest.fit(
             X=self.df[self.D.feature_names].to_numpy(),
@@ -192,7 +193,10 @@ def parameter_tuning(param_name, param_values, iterations=10):
             cf.fit(**{param_name: p})
 
             cft = CFT(cf)
-            cft.fit()
+            if param_name in ["max_depth", "min_samples_leaf"]:
+                cft.fit(**{param_name: p})
+            else:
+                cft.fit()
 
             for alg in [cf, cft]:
                 score = alg.get_topK()
