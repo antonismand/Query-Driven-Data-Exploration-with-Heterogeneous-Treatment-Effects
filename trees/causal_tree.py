@@ -1,3 +1,4 @@
+from time import time
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
@@ -6,14 +7,11 @@ from trees.data import Data
 
 
 class CT:
-    def __init__(
-        self,
-        D: Data,
-        on="D",
-    ):
+    def __init__(self, D: Data, on="D", debug=False):
         self.scores = []
         self.D = D
         self.on = on
+        self.debug = debug
 
         if on == "D":
             self.df = D.df
@@ -21,7 +19,6 @@ class CT:
             self.df = D.q_df
 
         self.algorithm = "CT on " + self.on
-        # self.fit()
 
     def fit(self, max_depth=6):
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
@@ -34,7 +31,14 @@ class CT:
         )
         self.tree = self.ctree.tree_
 
+    def scan(self):
+        start = time()
         self.parse_tree()
+        end = time()
+        self.scan_time = round(end - start, 2)
+
+        if self.debug:
+            print(f"Tree Scan: {self.scan_time}")
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(20, 20))
@@ -79,6 +83,9 @@ class CT:
                     "T0": round(self.tree.value[node_id][0][0], 2),
                     "T1": round(self.tree.value[node_id][1][0], 2),
                     "depth": depth,
+                    "rows": df2.shape[0],
+                    "selectivity": df2.shape[0] / self.D.df.shape[0],
+                    "selectivity_to_P_ratio": df2.shape[0] / self.D.q_df.shape[0],
                 }
             )
         else:
@@ -104,10 +111,3 @@ class CT:
                 max_depth=max_depth,
                 print_tree=print_tree,
             )
-
-    def get_topK(self, w=0.6, k=5, print_summaries=False):
-        top = self.D.get_topK(self.scores, w=w, k=k, print_summaries=print_summaries)
-
-        top["algorithm"] = self.algorithm
-
-        return top

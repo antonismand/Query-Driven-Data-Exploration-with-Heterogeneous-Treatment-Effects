@@ -10,11 +10,12 @@ from sklearn.ensemble import RandomForestClassifier
 
 
 class CF:
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, debug=False):
         self.scores = []
         self.D = D
         self.df = D.df
         self.algorithm = "CF"
+        self.debug = debug
 
     def fit(
         self,
@@ -41,9 +42,6 @@ class CF:
             min_samples_leaf=min_samples_leaf,
             max_features=max_features,
         )
-        # print(
-        #     f"n_estimators: {n_estimators}, criterion: {criterion}, max_depth: {max_depth}, cv: {cv}, min_samples_split: {min_samples_split}, min_samples_leaf: {min_samples_leaf}"
-        # )
 
         if tune:
             self.forest.tune(
@@ -58,15 +56,17 @@ class CF:
             T=self.df["treatment"].to_numpy(),
         )
 
-        self.parse_forest()
-
-    def parse_forest(self, max_depth=10):
+    def scan(self, max_depth=10):
         start = time()
         self.scores = []
         for tree in self.forest.model_cate.estimators_[0]:
             self.parse_tree(tree.tree_, max_depth=max_depth)
         end = time()
-        self.execution_time = round(end - start, 2)
+        self.scan_time = round(end - start, 2)
+
+        if self.debug:
+            print(f"{len(self.scores)} total splits")
+            print(f"Scan time: {self.scan_time}")
 
     def parse_tree(
         self,
@@ -76,7 +76,7 @@ class CF:
         left=False,
         prev_conditions="",
         depth=0,
-        max_depth=4,
+        max_depth=10,
     ):
 
         cate = round(tree.value[node_id][0][0], 3)
@@ -93,33 +93,17 @@ class CF:
             df2 = self.D.execute(full_condition, on="D")
             distance = round(self.D.jaccard_distance(self.D.q_df, df2), 3)
 
-            add_the_new = True
-
-            if "SingleTree" not in self.algorithm:
-                for score in self.scores:  # search for duplicates
-                    if abs(score["distance"] - distance) < 0.01:  # same distance from Q
-                        df_similar = self.D.execute(score["condition"], on="D")
-
-                        distance_between_similar = round(
-                            self.D.jaccard_distance(df_similar, df2), 2
-                        )  # distance between the conditions
-                        if distance_between_similar < 0.01:
-                            if score["t_est"] > cate:
-                                add_the_new = False
-                                break
-                            else:
-                                self.scores.remove(score)
-                                break
-
-            if add_the_new:
-                self.scores.append(
-                    {
-                        "condition": full_condition,
-                        "t_est": abs(cate),
-                        "distance": distance,
-                        "depth": depth,
-                    }
-                )
+            self.scores.append(
+                {
+                    "condition": full_condition,
+                    "t_est": abs(cate),
+                    "distance": distance,
+                    "depth": depth,
+                    "rows": df2.shape[0],
+                    "selectivity": df2.shape[0] / self.D.df.shape[0],
+                    "selectivity_to_P_ratio": df2.shape[0] / self.D.q_df.shape[0],
+                }
+            )
 
         if tree.children_left[node_id] != -1 and depth < max_depth:
             self.parse_tree(
@@ -141,27 +125,26 @@ class CF:
                 max_depth=max_depth,
             )
 
-    def get_topK(self, w=0.6, k=5, print_summaries=False):
-        top = self.D.get_topK(self.scores, w=w, k=k, print_summaries=print_summaries)
-
-        top["algorithm"] = self.algorithm
-        top["execution_time"] = self.execution_time
-
-        return top
+    def get_important_features(self, threshold=0.01):
+        important_features = []
+        for i, fi in enumerate(self.forest.feature_importances_):
+            if fi > threshold:
+                important_features.append(self.D.feature_names[i])
+        return important_features
 
 
 class CFT(CF):
-    def __init__(self, cf: CF):
+    def __init__(self, cf: CF, debug=False):
         self.scores = []
         self.df = cf.df
         self.D = cf.D
         self.cf = cf
+        self.debug = debug
 
         self.algorithm = "CF SingleTree"
 
     def fit(self, max_depth=4, min_samples_leaf=10, print_tree=False):
 
-        start = time()
         intrp = SingleTreeCateInterpreter(
             include_model_uncertainty=True,
             max_depth=max_depth,
@@ -173,9 +156,18 @@ class CFT(CF):
             plt.figure(figsize=(25, 5))
             intrp.plot(feature_names=self.D.feature_names, fontsize=12)
 
-        self.parse_tree(intrp.tree_model_.tree_)
+        self.final_tree = intrp.tree_model_.tree_
+
+    def scan(self):
+        start = time()
+        self.scores = []
+        self.parse_tree(self.final_tree)
         end = time()
-        self.execution_time = round(end - start, 2)
+        self.scan_time = round(end - start, 2)
+
+        if self.debug:
+            print(f"{len(self.scores)} total splits")
+            print("Scan time: ", self.scan_time)
 
 
 def parameter_tuning(param_name, param_values, iterations=10):

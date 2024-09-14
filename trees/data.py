@@ -1,3 +1,4 @@
+from time import time
 from causalml.dataset import synthetic_data
 import polars as pl
 import numpy as np
@@ -24,18 +25,20 @@ class Data:
         df["treatment"] = T
         df["ITE"] = tau
         df["id"] = df.index
+        self.max_t = df["ITE"].max()
 
         if override_p_with_2:
             self.feature_names = ["feature_0", "feature_1"]
             df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
 
         self.df = pl.DataFrame(df)
+
         return df.describe()
 
-    def execute(self, conditions: str, on="D"):
+    def execute(self, condition: str, on="D"):
         population = self.df if on == "D" else self.q_df
         ctx = pl.SQLContext(population=population, eager=True)
-        return ctx.execute("select * from population where " + conditions)
+        return ctx.execute("select * from population where " + condition)
 
     def CATE(self, condition: str):
         ctx = pl.SQLContext(population=self.df, eager=True)
@@ -50,8 +53,8 @@ class Data:
         self.p = p
         self.q_df = self.execute(p, on="D")
 
-    def calculate_selectivity(self, query: str):
-        return self.execute(query).shape[0] / self.df.shape[0]
+    def calculate_selectivity(self, condition: str):
+        return self.execute(condition).shape[0] / self.df.shape[0]
 
     def generate_random_condition(self, min_s=0.3, max_s=0.95):
         while True:
@@ -73,12 +76,43 @@ class Data:
         union = df1.shape[0] + df2.shape[0] - intersection
         return intersection / union
 
-    def get_topK(self, scores, w=0.6, k=5, print_summaries=True):
-        scores = pd.DataFrame(scores)
+    def remove_duplicates(self, scores, max_overlap_duplicate=0.8, k=5):
+        accepted = [scores.iloc[0]]
+
+        for i, row in scores.iterrows():
+            df1 = self.execute(row["condition"], on="D")
+            # ids = set(self.execute(row["condition"], on="D")["id"])
+            no_overlap = True
+            for row2 in accepted:
+                df2 = self.execute(row2["condition"], on="D")
+                # ids2 = set(self.execute(row2["condition"], on="D")["id"])
+
+                overlap = self.jaccard_distance(df1, df2)
+
+                # intersection = len(ids & ids2)
+                # union = len(ids) + len(ids2) - intersection
+                # overlap = intersection / union
+                if overlap > max_overlap_duplicate:
+                    no_overlap = False
+                    break
+
+            if no_overlap:
+                accepted.append(row)
+                if len(accepted) == k:
+                    return pd.DataFrame(accepted)
+
+        if len(accepted) != k:
+            raise ValueError("Not enough recommendations to return")
+
+    def get_topK(self, alg, w=0.6, k=5):
+        start = time()
+        scores = pd.DataFrame(alg.scores)
         scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
         scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
 
-        top = scores.sort_values("score", ascending=False).head(k)
+        scores = scores.sort_values("score", ascending=False)
+
+        top = self.remove_duplicates(scores, k=k)
 
         for i, row in top.iterrows():
             top.loc[i, "t"] = self.CATE(row["condition"])
@@ -86,49 +120,25 @@ class Data:
                 set(row["condition"].split()) & set(self.feature_names)
             )
 
-        best_t = top["t"].max()
-        top["true_score"] = w * top["t"] / best_t + (1 - w) * top["distance"]
+        # best_t = top["t"].max()
+        top["true_score"] = w * top["t"] / self.max_t + (1 - w) * top["distance"]
 
         # rounding
         top["true_score"] = top["true_score"].apply(lambda x: round(x, 2))
         top["score"] = top["score"].apply(lambda x: round(x, 2))
         top["norm_cate"] = top["norm_cate"].apply(lambda x: round(x, 2))
 
-        if print_summaries:
-            print(
-                "Score mean:",
-                round(top["score"].mean(), 2),
-                "±",
-                round(top["score"].std(), 2),
-            )
+        # calculate the coverage of the K conditions
+        ids = set()
+        for cond in top["condition"]:
+            ids.update(self.execute(cond, on="D")["id"])
+        top["coverage"] = len(ids) / self.df.shape[0]
 
-            print(
-                "True Score mean:",
-                round(top["true_score"].mean(), 2),
-                "±",
-                round(top["true_score"].std(), 2),
-            )
+        end = time()
+        top["algorithm"] = alg.algorithm
+        top["execution_time"] = round(end - start, 2) + alg.scan_time
 
-            print(
-                "Estimated CATE mean:",
-                round(top["t_est"].mean(), 2),
-                "±",
-                round(top["t_est"].std(), 2),
-            )
-            print(
-                "True CATE mean:",
-                round(top["t"].mean(), 2),
-                "±",
-                round(top["t"].std(), 2),
-            )
-
-            print(
-                "Distance mean:",
-                round(top["distance"].mean(), 2),
-                "±",
-                round(top["distance"].std(), 2),
-            )
-
-            print("Depth:", round(top["depth"].mean(), 1))
+        if alg.debug:
+            print(f"Time to retrieve top-K {round(end - start, 2)}")
 
         return top
