@@ -76,22 +76,22 @@ class Data:
         union = df1.shape[0] + df2.shape[0] - intersection
         return intersection / union
 
+    def overlap_coefficient(self, df1: pl.DataFrame, df2: pl.DataFrame):
+        intersection = df1.join(df2, how="inner", on="id").shape[0]
+        return intersection / min(df1.shape[0], df2.shape[0])
+
+    def overlap_measure(self, df1: pl.DataFrame, df2: pl.DataFrame):
+        return self.overlap_coefficient(df1, df2)
+
     def remove_duplicates(self, scores, max_overlap_duplicate=0.8, k=5):
         accepted = [scores.iloc[0]]
 
         for i, row in scores.iterrows():
             df1 = self.execute(row["condition"], on="D")
-            # ids = set(self.execute(row["condition"], on="D")["id"])
             no_overlap = True
             for row2 in accepted:
                 df2 = self.execute(row2["condition"], on="D")
-                # ids2 = set(self.execute(row2["condition"], on="D")["id"])
-
                 overlap = self.jaccard_distance(df1, df2)
-
-                # intersection = len(ids & ids2)
-                # union = len(ids) + len(ids2) - intersection
-                # overlap = intersection / union
                 if overlap > max_overlap_duplicate:
                     no_overlap = False
                     break
@@ -108,31 +108,38 @@ class Data:
         start = time()
         scores = pd.DataFrame(alg.scores)
         scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
-        scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["distance"]
+        scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["overlap"]
 
         scores = scores.sort_values("score", ascending=False)
 
         top = self.remove_duplicates(scores, k=k)
+        top.reset_index(drop=True, inplace=True)
 
+        ids = set()
+        total = 0
         for i, row in top.iterrows():
             top.loc[i, "t"] = self.CATE(row["condition"])
             top.loc[i, "features"] = len(
                 set(row["condition"].split()) & set(self.feature_names)
             )
 
+            executed = self.execute(row["condition"], on="D")["id"]
+            ids.update(executed)
+            # print(
+            #     f"{alg.algorithm} K={i+1}, rows={len(executed)}, new unique={len(ids)}"
+            # )
+            total += row["rows"]
+
+        top["overlap_between_K"] = len(ids) / total
+        top["coverage"] = len(ids) / self.df.shape[0]
+
         # best_t = top["t"].max()
-        top["true_score"] = w * top["t"] / self.max_t + (1 - w) * top["distance"]
+        top["true_score"] = w * top["t"] / self.max_t + (1 - w) * top["overlap"]
 
         # rounding
         top["true_score"] = top["true_score"].apply(lambda x: round(x, 2))
         top["score"] = top["score"].apply(lambda x: round(x, 2))
         top["norm_cate"] = top["norm_cate"].apply(lambda x: round(x, 2))
-
-        # calculate the coverage of the K conditions
-        ids = set()
-        for cond in top["condition"]:
-            ids.update(self.execute(cond, on="D")["id"])
-        top["coverage"] = len(ids) / self.df.shape[0]
 
         end = time()
         top["algorithm"] = alg.algorithm

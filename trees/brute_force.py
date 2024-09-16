@@ -42,11 +42,11 @@ class BruteForce:
         start = time()
         for i, x in enumerate(self.scores):
             df2 = self.D.execute(x["condition"], on="D")
-            overlap = round(self.D.jaccard_distance(self.D.q_df, df2), 3)
+            overlap = round(self.D.overlap_measure(self.D.q_df, df2), 3)
             self.scores[i] = {
                 "condition": x["condition"],
                 "t_est": x["t_est"],
-                "distance": overlap,
+                "overlap": overlap,
                 "depth": x["condition"].count("and") + 1,
                 "rows": df2.shape[0],
                 "selectivity": df2.shape[0] / self.D.df.shape[0],

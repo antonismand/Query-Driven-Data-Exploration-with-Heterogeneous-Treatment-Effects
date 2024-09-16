@@ -99,7 +99,7 @@ def plots(param_name, scores):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="distance", hue="algorithm", data=scores, ax=axs[0])
+    sns.barplot(x=param_name, y="overlap", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"Overlap to P (higher is better)")
     axs[0].set_ylabel("overlap")
     axs[0].legend(fontsize="x-small")

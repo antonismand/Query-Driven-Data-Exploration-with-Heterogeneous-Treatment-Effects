@@ -91,13 +91,13 @@ class CF:
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
             df2 = self.D.execute(full_condition, on="D")
-            distance = round(self.D.jaccard_distance(self.D.q_df, df2), 3)
+            overlap = round(self.D.overlap_measure(self.D.q_df, df2), 3)
 
             self.scores.append(
                 {
                     "condition": full_condition,
                     "t_est": abs(cate),
-                    "distance": distance,
+                    "overlap": overlap,
                     "depth": depth,
                     "rows": df2.shape[0],
                     "selectivity": df2.shape[0] / self.D.df.shape[0],
@@ -191,7 +191,8 @@ def parameter_tuning(param_name, param_values, iterations=10):
                 cft.fit()
 
             for alg in [cf, cft]:
-                score = alg.get_topK()
+                alg.scan()
+                score = data.get_topK(alg)
                 score[param_name] = p
                 scores = pd.concat([scores, score], ignore_index=True)
 

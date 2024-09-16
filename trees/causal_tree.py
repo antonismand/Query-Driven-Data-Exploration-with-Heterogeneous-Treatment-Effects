@@ -19,8 +19,11 @@ class CT:
             self.df = D.q_df
 
         self.algorithm = "CT on " + self.on
+        self.scan_time = 0
 
     def fit(self, max_depth=6):
+        if self.on == "P":
+            start = time()
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth
         )
@@ -30,15 +33,18 @@ class CT:
             treatment=self.df["treatment"].to_numpy(),
         )
         self.tree = self.ctree.tree_
+        if self.on == "P":
+            self.scan_time += round(time() - start, 2)
 
     def scan(self):
         start = time()
         self.parse_tree()
         end = time()
-        self.scan_time = round(end - start, 2)
+        self.scan_time += round(end - start, 2)
 
         if self.debug:
             print(f"Tree Scan: {self.scan_time}")
+            print("Total options: ", len(self.scores))
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(20, 20))
@@ -68,18 +74,18 @@ class CT:
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
-            df2 = self.D.execute(full_condition, on=self.on)
-            distance = round(self.D.jaccard_distance(self.D.q_df, df2), 3)
+            df2 = self.D.execute(full_condition)  # why self.on HERE?!
+            overlap = round(self.D.overlap_measure(self.D.q_df, df2), 3)
 
             if print_tree:
                 print(
-                    f"{depth * '  '}{full_condition},  CATE: {cate}, distance: {distance}"
+                    f"{depth * '  '}{full_condition},  CATE: {cate}, overlap: {overlap}"
                 )
             self.scores.append(
                 {
                     "condition": full_condition,
                     "t_est": abs(cate),
-                    "distance": distance,
+                    "overlap": overlap,
                     "T0": round(self.tree.value[node_id][0][0], 2),
                     "T1": round(self.tree.value[node_id][1][0], 2),
                     "depth": depth,
