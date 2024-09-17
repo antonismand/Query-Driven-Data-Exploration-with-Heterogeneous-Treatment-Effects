@@ -15,29 +15,32 @@ class CT:
 
         if on == "D":
             self.df = D.df
-        else:
-            self.df = D.q_df
 
         self.algorithm = "CT on " + self.on
         self.scan_time = 0
 
     def fit(self, max_depth=6):
-        if self.on == "P":
-            start = time()
+        self.max_depth = max_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth
         )
-        self.ctree.fit(
-            X=self.df[self.D.feature_names].to_numpy(),
-            y=self.df["outcome"].to_numpy(),
-            treatment=self.df["treatment"].to_numpy(),
-        )
-        self.tree = self.ctree.tree_
-        if self.on == "P":
-            self.scan_time += round(time() - start, 2)
+
+        if self.on == "D" or self.D.p is not None:
+            self.ctree.fit(
+                X=self.df[self.D.feature_names].to_numpy(),
+                y=self.df["outcome"].to_numpy(),
+                treatment=self.df["treatment"].to_numpy(),
+            )
+            self.tree = self.ctree.tree_
 
     def scan(self):
         start = time()
+        if self.on == "P":
+            if self.D.p is None:
+                raise ValueError("P is not set")
+            self.df = self.D.q_df
+            self.fit(self.max_depth)
+
         self.parse_tree()
         end = time()
         self.scan_time += round(end - start, 2)

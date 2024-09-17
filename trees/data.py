@@ -10,7 +10,13 @@ class Data:
         pass
 
     def generate(
-        self, n=10000, p=10, sigma=3.0, seed=42, mode=2, override_p_with_2=False
+        self,
+        n=10000,
+        p=10,
+        sigma=3.0,
+        seed=42,
+        mode=2,
+        override_p_with_2=False,
     ):
         np.random.seed(seed)
 
@@ -26,6 +32,7 @@ class Data:
         df["ITE"] = tau
         df["id"] = df.index
         self.max_t = df["ITE"].max()
+        self.p = None
 
         if override_p_with_2:
             self.feature_names = ["feature_0", "feature_1"]
@@ -56,6 +63,9 @@ class Data:
     def calculate_selectivity(self, condition: str):
         return self.execute(condition).shape[0] / self.df.shape[0]
 
+    def set_overlap_measure(self, overlap_measure="overlap_coefficient"):
+        self.overlap_measure = getattr(self, overlap_measure)
+
     def generate_random_condition(self, min_s=0.3, max_s=0.95):
         while True:
             p = np.random.choice(self.feature_names)
@@ -80,8 +90,8 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def overlap_measure(self, df1: pl.DataFrame, df2: pl.DataFrame):
-        return self.overlap_coefficient(df1, df2)
+    # def overlap_measure(self, df1: pl.DataFrame, df2: pl.DataFrame):
+    #     return self.overlap_coefficient(df1, df2)
 
     def remove_duplicates(self, scores, max_overlap_duplicate=0.8, k=5):
         accepted = [scores.iloc[0]]

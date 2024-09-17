@@ -32,6 +32,10 @@ class BruteForce:
         for option in options:
             if self.oracle:
                 t_est = self.D.CATE(option)
+            else:
+                t_est = self.cf.forest.effect(
+                    self.D.execute(option)[self.D.feature_names]
+                ).mean()
 
             self.scores.append({"condition": option, "t_est": t_est})
 
