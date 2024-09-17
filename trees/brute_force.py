@@ -51,7 +51,7 @@ class BruteForce:
                 "condition": x["condition"],
                 "t_est": x["t_est"],
                 "overlap": overlap,
-                "depth": x["condition"].count("and") + 1,
+                "depth": x["condition"].count("AND") + 1,
                 "rows": df2.shape[0],
                 "selectivity": df2.shape[0] / self.D.df.shape[0],
                 "selectivity_to_P_ratio": df2.shape[0] / self.D.q_df.shape[0],
@@ -88,7 +88,7 @@ class BruteForce:
 
         for x, y in list(product(gtlt, gtlt)):
             if x < y:
-                cond = f"{feature} > {round(x,2)} and {feature} < {round(y,2)}"
+                cond = f"{feature} > {round(x,2)} AND {feature} < {round(y,2)}"
                 if self.acceptable_selectivity(cond):
                     combinations.append(cond)
 
@@ -106,7 +106,7 @@ class BruteForce:
 
         for f1, f2 in list(combinations(features, 2)):
             for x in list(product(*[f_combs[f1], f_combs[f2]])):
-                cond = " and ".join(x)
+                cond = " AND ".join(x)
                 if self.acceptable_selectivity(cond):
                     combs.append(cond)
 

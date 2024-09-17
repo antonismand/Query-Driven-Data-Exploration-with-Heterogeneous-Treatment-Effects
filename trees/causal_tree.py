@@ -26,6 +26,9 @@ class CT:
         )
 
         if self.on == "D" or self.D.p is not None:
+            if self.on == "P":
+                self.df = self.D.q_df
+
             self.ctree.fit(
                 X=self.df[self.D.feature_names].to_numpy(),
                 y=self.df["outcome"].to_numpy(),
@@ -38,7 +41,7 @@ class CT:
         if self.on == "P":
             if self.D.p is None:
                 raise ValueError("P is not set")
-            self.df = self.D.q_df
+
             self.fit(self.max_depth)
 
         self.parse_tree()

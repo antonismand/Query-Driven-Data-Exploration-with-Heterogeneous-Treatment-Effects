@@ -19,6 +19,7 @@ class Experiment:
         var_name: str,
         data_iterations=5,
         user_iterations=5,
+        save_csv=True,
         **kwargs,
     ):
         scores = pd.DataFrame()
@@ -95,7 +96,8 @@ class Experiment:
         print("topK params", topK_params)
 
         plots(var_name, scores)
-        scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
+        if save_csv:
+            scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
 
     def get_algorithms(self, data):
         cf = CF(data)
