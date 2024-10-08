@@ -19,7 +19,7 @@ class CT:
         self.algorithm = "CT on " + self.on
         self.scan_time = 0
 
-    def fit(self, max_depth=6):
+    def fit(self, max_depth=None):
         self.max_depth = max_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth
@@ -36,7 +36,7 @@ class CT:
             )
             self.tree = self.ctree.tree_
 
-    def scan(self):
+    def scan(self, max_depth=100):
         start = time()
         if self.on == "P":
             if self.D.p is None:
@@ -44,7 +44,7 @@ class CT:
 
             self.fit(self.max_depth)
 
-        self.parse_tree()
+        self.parse_tree(max_depth=max_depth)
         end = time()
         self.scan_time += round(end - start, 2)
 
@@ -65,7 +65,7 @@ class CT:
         left=False,
         prev_conditions="",
         depth=0,
-        max_depth=10,
+        max_depth=100,
         print_tree=False,
     ):
 

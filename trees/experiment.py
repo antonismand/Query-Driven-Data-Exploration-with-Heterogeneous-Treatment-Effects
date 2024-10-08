@@ -55,7 +55,8 @@ class Experiment:
                     for condition_values in product(*condition_params.values()):
                         condition_dict = dict(zip(condition_keys, condition_values))
                         print("Generating random condition", condition_dict)
-                        data.generate_random_condition(**condition_dict)
+                        cond, s = data.generate_random_condition(**condition_dict)
+                        print("User condition:", cond, "Selectivity:", s)
 
                         for overlap_values in product(*overlap_params.values()):
                             overlap_dict = dict(zip(overlap_keys, overlap_values))
@@ -133,7 +134,6 @@ def plots(param_name, scores):
     sns.barplot(x=param_name, y="t_est", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Estimated CATE")
     axs[1].set_ylabel(r"$\hat{{\tau}}(x)$")
-    # axs[1].legend(fontsize="x-small")
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -147,7 +147,6 @@ def plots(param_name, scores):
 
     sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Score")
-    # axs[1].legend(fontsize="x-small")
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -159,10 +158,11 @@ def plots(param_name, scores):
     axs[0].set_ylabel("overlap")
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="coverage", hue="algorithm", data=scores, ax=axs[1])
-    axs[1].set_title(f"Coverage")
-    # axs[1].set_ylabel("coverage")
-    # plt.legend(fontsize="x-small")
+    sns.barplot(
+        x=param_name, y="unique_between_K", hue="algorithm", data=scores, ax=axs[1]
+    )
+    axs[1].set_title(f"Unique between K")
+    axs[1].set_ylabel("% Unique")
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -175,7 +175,6 @@ def plots(param_name, scores):
 
     sns.barplot(x=param_name, y="features", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Features")
-    # axs[1].legend(fontsize="x-small")
     axs[1].legend([], [], frameon=False)
     plt.show()
 

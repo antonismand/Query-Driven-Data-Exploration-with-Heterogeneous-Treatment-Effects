@@ -17,10 +17,11 @@ def visualize_recommendations(data, scores, k=5):
 
         sns.barplot(x=["T0", "T1"], y=[topK["T0"], topK["T1"]], ax=axs[i])
         axs[i].set_title("K=" + str(i + 1))
+        axs[i].set_yticks(np.arange(0, 8, 1))
         axs[i].set_xlabel("treatment")
         axs[i].set_ylabel("outcome")
 
-        outer_text = f"{topK['condition']} \n\n Size: {dt.shape[0]} \n CATE: {str(topK['t_est'])} \n overlap: {str(topK['overlap'])}\n Score: 0.6*{str(topK['norm_cate'])} + (1-0.6)*{str(topK['overlap'])}  =  {str(round(topK['score'],2))}"
+        outer_text = f"{topK['condition']} \n\n Size: {dt.shape[0]} \n Est CATE: {str(topK['t_est'])} \n overlap: {str(topK['overlap'])}\n Score: 0.6*{str(topK['norm_cate'])} + (1-0.6)*{str(topK['overlap'])}  =  {str(round(topK['score'],2))}"
         axs[i].annotate(
             outer_text,
             xy=(1, 1),
@@ -53,7 +54,7 @@ def visualize_recommendations2(data, scores, k=5):
         # axs[i].set_xlabel("treatment")
         # axs[i].set_ylabel("outcome")
 
-        outer_text = f"{topK['condition']} \n\n Size: {dt.shape[0]} \n CATE: {str(topK['t_est'])} \n overlap: {str(topK['overlap'])}\n Score: 0.6*{str(topK['norm_cate'])} + (1-0.6)*{str(topK['overlap'])}  =  {str(round(topK['score'],2))}"
+        outer_text = f"{topK['condition']} \n\n Size: {dt.shape[0]} \n Est CATE: {str(topK['t_est'])} \n overlap: {str(topK['overlap'])}\n Score: 0.6*{str(topK['norm_cate'])} + (1-0.6)*{str(topK['overlap'])}  =  {str(round(topK['score'],2))}"
         axs[i].annotate(
             outer_text,
             xy=(1, 1),

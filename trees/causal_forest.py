@@ -22,7 +22,7 @@ class CF:
         criterion="mse",
         n_estimators=100,
         tune=False,
-        max_depth=4,
+        max_depth=None,
         cv=2,
         min_samples_split=10,
         min_samples_leaf=5,
@@ -56,7 +56,7 @@ class CF:
             T=self.df["treatment"].to_numpy(),
         )
 
-    def scan(self, max_depth=10):
+    def scan(self, max_depth=100):
         start = time()
         self.scores = []
         for tree in self.forest.model_cate.estimators_[0]:
@@ -76,7 +76,7 @@ class CF:
         left=False,
         prev_conditions="",
         depth=0,
-        max_depth=10,
+        max_depth=100,
     ):
 
         cate = round(tree.value[node_id][0][0], 3)
@@ -128,6 +128,7 @@ class CF:
     def get_important_features(self, threshold=0.01):
         important_features = []
         for i, fi in enumerate(self.forest.feature_importances_):
+            # print(f"{self.D.feature_names[i]}: {fi}")
             if fi > threshold:
                 important_features.append(self.D.feature_names[i])
         return important_features
@@ -143,7 +144,7 @@ class CFT(CF):
 
         self.algorithm = "CF SingleTree"
 
-    def fit(self, max_depth=4, min_samples_leaf=10, print_tree=False):
+    def fit(self, max_depth=None, min_samples_leaf=10, print_tree=False):
 
         intrp = SingleTreeCateInterpreter(
             include_model_uncertainty=True,

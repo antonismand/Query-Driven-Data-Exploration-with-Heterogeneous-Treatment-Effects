@@ -5,7 +5,9 @@ from trees.causal_forest import CF
 
 
 class BruteForce:
-    def __init__(self, cf: CF, oracle=True, min_rows=50, debug=False):
+    def __init__(
+        self, cf: CF, oracle=True, min_rows=50, max_selectivity=0.8, debug=False
+    ):
 
         self.D = cf.D
         self.df = cf.D.df
@@ -18,11 +20,14 @@ class BruteForce:
         self.options = []
         self.debug = debug
         self.min_rows = min_rows
+        self.max_selectivity = max_selectivity
 
     def acceptable_selectivity(self, cond):
-        return self.D.execute(cond).shape[0] > self.min_rows
-        # s = self.D.calculate_selectivity(cond)
-        # return s > self.min_s and s < self.max_s
+        n_rows = self.D.execute(cond).shape[0]
+        return (
+            n_rows > self.min_rows
+            and n_rows / self.D.df.shape[0] < self.max_selectivity
+        )
 
     def fit(self):
         important_features = self.cf.get_important_features()

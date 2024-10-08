@@ -63,7 +63,7 @@ class Data:
     def calculate_selectivity(self, condition: str):
         return self.execute(condition).shape[0] / self.df.shape[0]
 
-    def set_overlap_measure(self, overlap_measure="overlap_coefficient"):
+    def set_overlap_measure(self, overlap_measure="jaccard_distance"):
         self.overlap_measure = getattr(self, overlap_measure)
 
     def generate_random_condition(self, min_s=0.3, max_s=0.95):
@@ -93,14 +93,14 @@ class Data:
     # def overlap_measure(self, df1: pl.DataFrame, df2: pl.DataFrame):
     #     return self.overlap_coefficient(df1, df2)
 
-    def remove_duplicates(self, scores, max_overlap_duplicate=0.8, k=5):
+    def remove_duplicates(self, scores, max_overlap_duplicate, k):
         accepted = [scores.iloc[0]]
 
         for i, row in scores.iterrows():
-            df1 = self.execute(row["condition"], on="D")
+            df1 = self.execute(row["condition"])
             no_overlap = True
             for row2 in accepted:
-                df2 = self.execute(row2["condition"], on="D")
+                df2 = self.execute(row2["condition"])
                 overlap = self.jaccard_distance(df1, df2)
                 if overlap > max_overlap_duplicate:
                     no_overlap = False
@@ -114,7 +114,7 @@ class Data:
         if len(accepted) != k:
             raise ValueError("Not enough recommendations to return")
 
-    def get_topK(self, alg, w=0.6, k=5):
+    def get_topK(self, alg, w=0.6, k=5, max_overlap_duplicate=0.8):
         start = time()
         scores = pd.DataFrame(alg.scores)
         scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
@@ -122,7 +122,9 @@ class Data:
 
         scores = scores.sort_values("score", ascending=False)
 
-        top = self.remove_duplicates(scores, k=k)
+        top = self.remove_duplicates(
+            scores, k=k, max_overlap_duplicate=max_overlap_duplicate
+        )
         top.reset_index(drop=True, inplace=True)
 
         ids = set()
@@ -140,8 +142,7 @@ class Data:
             # )
             total += row["rows"]
 
-        top["overlap_between_K"] = len(ids) / total
-        top["coverage"] = len(ids) / self.df.shape[0]
+        top["unique_between_K"] = len(ids) / total
 
         # best_t = top["t"].max()
         top["true_score"] = w * top["t"] / self.max_t + (1 - w) * top["overlap"]
@@ -159,3 +160,6 @@ class Data:
             print(f"Time to retrieve top-K {round(end - start, 2)}")
 
         return top
+
+    def prune_invalid(self, alg_scores):
+        scores = pd.DataFrame(alg_scores)
