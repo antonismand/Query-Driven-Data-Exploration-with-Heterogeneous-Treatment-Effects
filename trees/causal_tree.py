@@ -2,13 +2,12 @@ from time import time
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
-import pandas as pd
 from trees.data import Data
 
 
 class CT:
     def __init__(self, D: Data, on="D", debug=False):
-        self.scores = []
+        self.options = []
         self.D = D
         self.on = on
         self.debug = debug
@@ -36,6 +35,8 @@ class CT:
             )
             self.tree = self.ctree.tree_
 
+        self.scan()
+
     def scan(self, max_depth=100):
         start = time()
         if self.on == "P":
@@ -50,7 +51,7 @@ class CT:
 
         if self.debug:
             print(f"Tree Scan: {self.scan_time}")
-            print("Total options: ", len(self.scores))
+            print("Total options: ", len(self.options))
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(20, 20))
@@ -80,24 +81,15 @@ class CT:
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
-            df2 = self.D.execute(full_condition)  # why self.on HERE?!
-            overlap = round(self.D.overlap_measure(self.D.q_df, df2), 3)
-
             if print_tree:
-                print(
-                    f"{depth * '  '}{full_condition},  CATE: {cate}, overlap: {overlap}"
-                )
-            self.scores.append(
+                print(f"{depth * '  '}{full_condition},  CATE: {cate}")
+            self.options.append(
                 {
                     "condition": full_condition,
                     "t_est": abs(cate),
-                    "overlap": overlap,
                     "T0": round(self.tree.value[node_id][0][0], 2),
                     "T1": round(self.tree.value[node_id][1][0], 2),
                     "depth": depth,
-                    "rows": df2.shape[0],
-                    "selectivity": df2.shape[0] / self.D.df.shape[0],
-                    "selectivity_to_P_ratio": df2.shape[0] / self.D.q_df.shape[0],
                 }
             )
         else:

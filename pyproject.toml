@@ -19,6 +19,8 @@ duecredit = "^0.10.2"
 pandasql = "^0.7.3"
 polars = "^1.2.1"
 tqdm = "^4.66.4"
+sqlglot = "^25.24.5"
+sympy = "^1.13.3"
 
 
 [tool.poetry.group.dev.dependencies]

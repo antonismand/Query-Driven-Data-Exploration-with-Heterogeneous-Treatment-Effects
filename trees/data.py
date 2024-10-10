@@ -4,6 +4,8 @@ import polars as pl
 import numpy as np
 import pandas as pd
 
+from trees.parser import Predicate, format_interval
+
 
 class Data:
     def __init__(self):
@@ -161,5 +163,28 @@ class Data:
 
         return top
 
-    def prune_invalid(self, alg_scores):
-        scores = pd.DataFrame(alg_scores)
+    def get_valid_subgroups(self, p: str, options: list, min_rows=5):
+        """
+        Get valid subgroups based on the provided Predicate.
+
+        Args:
+            P (str): The user's predicate in string format.
+            options (list): The list of subgroups to evaluate.
+        """
+
+        pp = Predicate(f"select * from x where {p}")
+        accepted_subgroups = []
+        for opt in options:
+            s = Predicate("select * from x where " + opt["condition"], combine=True)
+            if s.satisfies(pp):
+                r = f"{p} AND {opt['condition']}"
+                df = self.execute(r)
+                if df.shape[0] > min_rows:
+                    opt["rows"] = df.shape[0]
+                    opt["combined"] = {
+                        k: format_interval(v) for k, v in s.combined.items()
+                    }
+                    opt["features"] = len(s.combined)
+                    accepted_subgroups.append(opt)
+
+        return accepted_subgroups
