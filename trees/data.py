@@ -5,11 +5,12 @@ import numpy as np
 import pandas as pd
 
 from trees.parser import Predicate, format_interval
+from trees.scanners import Greedy
 
 
 class Data:
     def __init__(self):
-        pass
+        self.p = None
 
     def generate(
         self,
@@ -88,6 +89,9 @@ class Data:
         union = df1.shape[0] + df2.shape[0] - intersection
         return intersection / union
 
+    def jaccard_over_preds(self, s1: str, s2: str):
+        return self.jaccard_distance(self.execute(s1), self.execute(s2))
+
     def overlap_coefficient(self, df1: pl.DataFrame, df2: pl.DataFrame):
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
@@ -116,62 +120,43 @@ class Data:
         if len(accepted) != k:
             raise ValueError("Not enough recommendations to return")
 
-    def get_topK(self, alg, w=0.6, k=5, max_overlap_duplicate=0.8):
+    def get_topK(self, options: list, w=0.6, k=5, scan_method=Greedy, P=None):
+        if P is None:
+            if self.p is None:
+                raise ValueError("no P given")
+            P = self.p
+
+        self.w = w
+        self.k = k
+
+        subgroups = self.get_valid_subgroups(P, options)
+
         start = time()
-        scores = pd.DataFrame(alg.scores)
-        scores["norm_cate"] = scores["t_est"] / scores["t_est"].max()
-        scores["score"] = w * scores["norm_cate"] + (1 - w) * scores["overlap"]
-
-        scores = scores.sort_values("score", ascending=False)
-
-        top = self.remove_duplicates(
-            scores, k=k, max_overlap_duplicate=max_overlap_duplicate
-        )
-        top.reset_index(drop=True, inplace=True)
-
-        ids = set()
-        total = 0
-        for i, row in top.iterrows():
-            top.loc[i, "t"] = self.CATE(row["condition"])
-            top.loc[i, "features"] = len(
-                set(row["condition"].split()) & set(self.feature_names)
-            )
-
-            executed = self.execute(row["condition"], on="D")["id"]
-            ids.update(executed)
-            # print(
-            #     f"{alg.algorithm} K={i+1}, rows={len(executed)}, new unique={len(ids)}"
-            # )
-            total += row["rows"]
-
-        top["unique_between_K"] = len(ids) / total
-
-        # best_t = top["t"].max()
-        top["true_score"] = w * top["t"] / self.max_t + (1 - w) * top["overlap"]
-
-        # rounding
-        top["true_score"] = top["true_score"].apply(lambda x: round(x, 2))
-        top["score"] = top["score"].apply(lambda x: round(x, 2))
-        top["norm_cate"] = top["norm_cate"].apply(lambda x: round(x, 2))
-
+        subgroups = scan_method(self, subgroups)
         end = time()
-        top["algorithm"] = alg.algorithm
-        top["execution_time"] = round(end - start, 2) + alg.scan_time
+        scan_time = round(end - start, 2)
+        print(scan_method.__name__, "time:", scan_time)
 
-        if alg.debug:
-            print(f"Time to retrieve top-K {round(end - start, 2)}")
+        for s in subgroups:
 
-        return top
+            s["t"] = self.CATE(s["condition"])
+
+            s["scan_method"] = scan_method.__name__
+            s["scan_time"] = scan_time
+
+            # s['true_score'] = w * s["t"] / self.max_t + (1 - w) * s["overlap_penalty"]
+
+        return pd.DataFrame(subgroups)
 
     def get_valid_subgroups(self, p: str, options: list, min_rows=5):
         """
         Get valid subgroups based on the provided Predicate.
 
         Args:
-            P (str): The user's predicate in string format.
+            P (str): The user's predicate in string format (WHERE only).
             options (list): The list of subgroups to evaluate.
         """
-
+        start = time()
         pp = Predicate(f"select * from x where {p}")
         accepted_subgroups = []
         for opt in options:
@@ -181,10 +166,69 @@ class Data:
                 df = self.execute(r)
                 if df.shape[0] > min_rows:
                     opt["rows"] = df.shape[0]
-                    opt["combined"] = {
-                        k: format_interval(v) for k, v in s.combined.items()
-                    }
+                    opt["combined"] = " AND ".join(
+                        [f"{k} ∈ {format_interval(v)}" for k, v in s.combined.items()]
+                    )
                     opt["features"] = len(s.combined)
                     accepted_subgroups.append(opt)
 
+        end = time()
+        print(
+            f"Validating {len(options)} subgroups. Accepted subgroups: {len(accepted_subgroups)}. Time: {round(end - start, 2)}"
+        )
         return accepted_subgroups
+
+    def compute_topK_scores(self, subgroups: list):
+        max_t = 0
+        max_op = 0
+
+        for i, s1 in enumerate(subgroups):
+            overlap = 0
+            for j, s2 in enumerate(subgroups):
+                if i != j:
+                    overlap += self.jaccard_over_preds(s1["condition"], s2["condition"])
+
+            s1["overlap"] = overlap
+
+            if s1["t_est"] > max_t:
+                max_t = s1["t_est"]
+
+            if s1["overlap"] > max_op:
+                max_op = s1["overlap"]
+
+        min_score = 999999994299999999
+        min_score_i = -1
+
+        for i, s in enumerate(subgroups):
+            if max_op == 0:
+                if s["overlap"] == 0:
+                    op_penalty = 0
+                else:
+                    op_penalty = 1
+            else:
+                op_penalty = s["overlap"] / max_op
+
+            s["score"] = self.w * s["t_est"] / max_t + (1 - self.w) * (1 - op_penalty)
+            if s["score"] < min_score:
+                min_score = s["score"]
+                min_score_i = i
+
+        return subgroups, max_t, max_op, min_score, min_score_i
+
+    def compute_score_for_subgroup(self, top_subgroups: list, s, max_t, max_op):
+        s_overlap = sum(
+            [
+                self.jaccard_over_preds(top_sub["condition"], s["condition"])
+                for top_sub in top_subgroups
+            ]
+        )
+        if max_op == 0:
+            if s_overlap == 0:
+                op_penalty = 0
+            else:
+                op_penalty = 1
+        else:
+            op_penalty = s_overlap / max_op
+
+        score = self.w * s["t_est"] / max_t + (1 - self.w) * (1 - op_penalty)
+        return score

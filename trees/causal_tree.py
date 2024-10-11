@@ -90,6 +90,7 @@ class CT:
                     "T0": round(self.tree.value[node_id][0][0], 2),
                     "T1": round(self.tree.value[node_id][1][0], 2),
                     "depth": depth,
+                    "algorithm": self.algorithm,
                 }
             )
         else:
