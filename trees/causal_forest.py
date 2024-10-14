@@ -56,6 +56,8 @@ class CF:
             T=self.df["treatment"].to_numpy(),
         )
 
+        self.scan()
+
     def scan(self, max_depth=100):
         start = time()
         self.scores = []
@@ -90,19 +92,8 @@ class CF:
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
-            df2 = self.D.execute(full_condition, on="D")
-            overlap = round(self.D.overlap_measure(self.D.q_df, df2), 3)
-
             self.scores.append(
-                {
-                    "condition": full_condition,
-                    "t_est": abs(cate),
-                    "overlap": overlap,
-                    "depth": depth,
-                    "rows": df2.shape[0],
-                    "selectivity": df2.shape[0] / self.D.df.shape[0],
-                    "selectivity_to_P_ratio": df2.shape[0] / self.D.q_df.shape[0],
-                }
+                {"condition": full_condition, "t_est": abs(cate), "depth": depth}
             )
 
         if tree.children_left[node_id] != -1 and depth < max_depth:
@@ -158,6 +149,8 @@ class CFT(CF):
             intrp.plot(feature_names=self.D.feature_names, fontsize=12)
 
         self.final_tree = intrp.tree_model_.tree_
+
+        self.scan()
 
     def scan(self):
         start = time()
