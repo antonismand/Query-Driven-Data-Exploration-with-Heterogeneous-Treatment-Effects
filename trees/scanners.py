@@ -4,14 +4,18 @@ def Greedy(D, subgroups: list):
 
     subgroups = sorted(subgroups, key=lambda x: x["t_est"], reverse=True)
 
+    total_subgroups = len(subgroups)
+    percentile_index = int(0.9 * total_subgroups)
+    bottom_10th_percentile = subgroups[percentile_index]["t_est"]
+
     top_subs = subgroups[: D.k].copy()
 
     top_subs, max_t, max_op, min_score, min_score_i = D.compute_topK_scores(top_subs)
 
-    theta = 1
+    theta = bottom_10th_percentile
     i = D.k + 1
 
-    while subgroups[i]["t_est"] > theta:
+    while i < total_subgroups and subgroups[i]["t_est"] > theta:
         score_si = D.compute_score_for_subgroup(
             top_subgroups=top_subs, s=subgroups[i], max_t=max_t, max_op=max_op
         )

@@ -1,4 +1,3 @@
-from time import time
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
@@ -6,52 +5,28 @@ from trees.data import Data
 
 
 class CT:
-    def __init__(self, D: Data, on="D", debug=False):
+    def __init__(self, D: Data):
         self.options = []
         self.D = D
-        self.on = on
-        self.debug = debug
 
-        if on == "D":
-            self.df = D.df
+        self.algorithm = "CT on D"
+        self.df = D.df
 
-        self.algorithm = "CT on " + self.on
-        self.scan_time = 0
-
-    def fit(self, max_depth=None):
+    def fit(self, max_depth=100):
         self.max_depth = max_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth
         )
-
-        if self.on == "D" or self.D.p is not None:
-            if self.on == "P":
-                self.df = self.D.q_df
-
-            self.ctree.fit(
-                X=self.df[self.D.feature_names].to_numpy(),
-                y=self.df["outcome"].to_numpy(),
-                treatment=self.df["treatment"].to_numpy(),
-            )
-            self.tree = self.ctree.tree_
-
-        self.scan()
-
-    def scan(self, max_depth=100):
-        start = time()
-        if self.on == "P":
-            if self.D.p is None:
-                raise ValueError("P is not set")
-
-            self.fit(self.max_depth)
-
+        self.ctree.fit(
+            X=self.df[self.D.feature_names].to_numpy(),
+            y=self.df["outcome"].to_numpy(),
+            treatment=self.df["treatment"].to_numpy(),
+        )
+        self.tree = self.ctree.tree_
         self.parse_tree(max_depth=max_depth)
-        end = time()
-        self.scan_time += round(end - start, 2)
 
-        if self.debug:
-            print(f"Tree Scan: {self.scan_time}")
-            print("Total options: ", len(self.options))
+    def online(self):
+        return self.D.get_valid_subgroups(self.options)
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(20, 20))
@@ -116,3 +91,30 @@ class CT:
                 max_depth=max_depth,
                 print_tree=print_tree,
             )
+
+
+class CTP(CT):
+    def __init__(self, D: Data):
+        self.options = []
+        self.D = D
+
+        self.algorithm = "CT on P"
+
+    def fit(self):
+        pass
+
+    def online(self):
+        if self.D.p is None:
+            raise ValueError("P is not set")
+
+        self.df = self.D.q_df
+        self.ctree: CausalTreeRegressor = CausalTreeRegressor(groups_cnt=True)
+        self.ctree.fit(
+            X=self.df[self.D.feature_names].to_numpy(),
+            y=self.df["outcome"].to_numpy(),
+            treatment=self.df["treatment"].to_numpy(),
+        )
+        self.tree = self.ctree.tree_
+
+        self.parse_tree()
+        return self.D.get_valid_subgroups(self.options)

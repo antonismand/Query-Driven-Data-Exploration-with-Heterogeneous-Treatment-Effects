@@ -66,9 +66,6 @@ class Data:
     def calculate_selectivity(self, condition: str):
         return self.execute(condition).shape[0] / self.df.shape[0]
 
-    def set_overlap_measure(self, overlap_measure="jaccard_distance"):
-        self.overlap_measure = getattr(self, overlap_measure)
-
     def generate_random_condition(self, min_s=0.3, max_s=0.95):
         while True:
             p = np.random.choice(self.feature_names)
@@ -120,22 +117,20 @@ class Data:
         if len(accepted) != k:
             raise ValueError("Not enough recommendations to return")
 
-    def get_topK(self, options: list, w=0.6, k=5, scan_method=Greedy, P=None):
-        if P is None:
-            if self.p is None:
-                raise ValueError("no P given")
-            P = self.p
+    def get_topK(self, options: list, w=0.6, k=5, scan_method=Greedy):
+        if self.p is None:
+            raise ValueError("no P given")
 
         self.w = w
         self.k = k
 
-        subgroups = self.get_valid_subgroups(P, options)
+        n_options = len(options)
 
         start = time()
-        subgroups = scan_method(self, subgroups)
+        subgroups = scan_method(self, options)
         end = time()
         scan_time = round(end - start, 2)
-        print(scan_method.__name__, "time:", scan_time)
+        # print(scan_method.__name__, "time:", scan_time)
 
         for s in subgroups:
 
@@ -144,11 +139,13 @@ class Data:
             s["scan_method"] = scan_method.__name__
             s["scan_time"] = scan_time
 
+            s["valid_options"] = n_options
+
             # s['true_score'] = w * s["t"] / self.max_t + (1 - w) * s["overlap_penalty"]
 
         return pd.DataFrame(subgroups)
 
-    def get_valid_subgroups(self, p: str, options: list, min_rows=5):
+    def get_valid_subgroups(self, options: list, min_rows=5):
         """
         Get valid subgroups based on the provided Predicate.
 
@@ -156,13 +153,18 @@ class Data:
             P (str): The user's predicate in string format (WHERE only).
             options (list): The list of subgroups to evaluate.
         """
+        if self.p is None:
+            raise ValueError("no P given")
+
         start = time()
-        pp = Predicate(f"select * from x where {p}")
+        n_options = len(options)
+
+        pp = Predicate(f"select * from x where {self.p}")
         accepted_subgroups = []
         for opt in options:
             s = Predicate("select * from x where " + opt["condition"], combine=True)
             if s.satisfies(pp):
-                r = f"{p} AND {opt['condition']}"
+                r = f"{self.p} AND {opt['condition']}"
                 df = self.execute(r)
                 if df.shape[0] > min_rows:
                     opt["rows"] = df.shape[0]
@@ -170,12 +172,13 @@ class Data:
                         [f"{k} ∈ {format_interval(v)}" for k, v in s.combined.items()]
                     )
                     opt["features"] = len(s.combined)
+                    opt["total_options"] = n_options
                     accepted_subgroups.append(opt)
 
         end = time()
-        print(
-            f"Validating {len(options)} subgroups. Accepted subgroups: {len(accepted_subgroups)}. Time: {round(end - start, 2)}"
-        )
+        for accepted in accepted_subgroups:
+            accepted["validate_time"] = round(end - start, 2)
+
         return accepted_subgroups
 
     def compute_topK_scores(self, subgroups: list):

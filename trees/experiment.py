@@ -1,5 +1,6 @@
 import inspect
 from itertools import product
+from time import time
 from matplotlib import pyplot as plt
 import pandas as pd
 from tqdm import tqdm
@@ -7,9 +8,8 @@ import seaborn as sns
 from IPython.display import clear_output
 
 
-from trees.brute_force import BruteForce
 from trees.causal_forest import CF, CFT
-from trees.causal_tree import CT
+from trees.causal_tree import CT, CTP
 from trees.data import Data
 
 
@@ -33,54 +33,65 @@ class Experiment:
         topK_params = self.get_signature(Data().get_topK, kwargs)
         topK_keys = list(topK_params.keys())
 
-        overlap_params = self.get_signature(Data().set_overlap_measure, kwargs)
-        overlap_keys = list(overlap_params.keys())
-
         for data_values in product(*data_params.values()):
             param_dict = dict(zip(data_keys, data_values))
 
             for exp in tqdm(range(data_iterations)):
                 data = Data()
                 param_dict["seed"] = exp
+                print("-" * 20, "New data", "-" * 20)
                 print("Generating data", param_dict)
                 data.generate(**param_dict)
 
                 algorithms = self.get_algorithms(data)
 
                 for alg in algorithms:
-                    print("fitting", alg.algorithm)
+                    start = time()
                     alg.fit()
+                    end = round(time() - start, 2)
+                    print(f"[{alg.algorithm}] Offline time: {end}s")
 
                 for j in range(user_iterations):
                     for condition_values in product(*condition_params.values()):
                         condition_dict = dict(zip(condition_keys, condition_values))
+                        print(
+                            "-" * 10,
+                            "Condition",
+                            j + 1,
+                            "out of",
+                            user_iterations,
+                            "-" * 10,
+                        )
                         print("Generating random condition", condition_dict)
                         cond, s = data.generate_random_condition(**condition_dict)
                         print("User condition:", cond, "Selectivity:", s)
 
-                        for overlap_values in product(*overlap_params.values()):
-                            overlap_dict = dict(zip(overlap_keys, overlap_values))
-                            print("Setting overlap", overlap_dict)
-                            data.set_overlap_measure(**overlap_dict)
+                        for alg in algorithms:
+                            start = time()
+                            valid_options = alg.online()
+                            end = round(time() - start, 2)
+                            print(
+                                f"[{alg.algorithm}] Online time: {end}s, Total Splits: {len(alg.options)}, Valid: {len(valid_options)}"
+                            )
 
-                            for alg in algorithms:
-                                print("scanning", alg.algorithm)
-                                alg.scan()
+                            for topK_values in product(*topK_params.values()):
+                                topK_dict = dict(zip(topK_keys, topK_values))
+                                start = time()
+                                score = data.get_topK(
+                                    options=valid_options, **topK_dict
+                                )
+                                end = round(time() - start, 2)
+                                print(
+                                    f"[{alg.algorithm}] get topK in {end}s - {str(topK_dict)}"
+                                )
 
-                                for topK_values in product(*topK_params.values()):
-                                    topK_dict = dict(zip(topK_keys, topK_values))
-                                    print("get topK", alg.algorithm, topK_dict)
-                                    score = data.get_topK(alg=alg, **topK_dict)
-                                    current_combination = {
-                                        **param_dict,
-                                        **condition_dict,
-                                        **overlap_dict,
-                                        **topK_dict,
-                                    }
-                                    score[var_name] = current_combination[var_name]
-                                    scores = pd.concat(
-                                        [scores, score], ignore_index=True
-                                    )
+                                current_combination = {
+                                    **param_dict,
+                                    **condition_dict,
+                                    **topK_dict,
+                                }
+                                score[var_name] = current_combination[var_name]
+                                scores = pd.concat([scores, score], ignore_index=True)
 
                 clear_output(wait=True)
 
@@ -93,7 +104,6 @@ class Experiment:
         )
         print("data params", data_params)
         print("condition params", condition_params)
-        print("overlap params", overlap_params)
         print("topK params", topK_params)
 
         plots(var_name, scores)
@@ -101,14 +111,13 @@ class Experiment:
             scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
 
     def get_algorithms(self, data):
-        cf = CF(data)
         return [
-            CT(data, on="D"),
-            CT(data, on="P"),
-            cf,
-            CFT(cf),
+            CT(data),
+            CTP(data),
+            # CF(data),
+            CFT(data),
             # BruteForce(cf, oracle=False),
-            BruteForce(cf),
+            # BruteForce(cf),
         ]
 
     def get_signature(self, func, kwargs):
@@ -139,11 +148,11 @@ def plots(param_name, scores):
 
     # ----------------- #
 
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="true_score", hue="algorithm", data=scores, ax=axs[0])
-    axs[0].set_title(f"True score (higher is better)")
-    axs[0].set_ylabel("True Score")
-    axs[0].legend(fontsize="x-small")
+    # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    # sns.barplot(x=param_name, y="true_score", hue="algorithm", data=scores, ax=axs[0])
+    # axs[0].set_title(f"True score (higher is better)")
+    # axs[0].set_ylabel("True Score")
+    # axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Score")
@@ -154,17 +163,17 @@ def plots(param_name, scores):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     sns.barplot(x=param_name, y="overlap", hue="algorithm", data=scores, ax=axs[0])
-    axs[0].set_title(f"Overlap to P (higher is better)")
+    axs[0].set_title(f"Overlap")
     axs[0].set_ylabel("overlap")
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(
-        x=param_name, y="unique_between_K", hue="algorithm", data=scores, ax=axs[1]
-    )
-    axs[1].set_title(f"Unique between K")
-    axs[1].set_ylabel("% Unique")
-    axs[1].legend([], [], frameon=False)
-    plt.show()
+    # sns.barplot(
+    #     x=param_name, y="unique_between_K", hue="algorithm", data=scores, ax=axs[1]
+    # )
+    # axs[1].set_title(f"Unique between K")
+    # axs[1].set_ylabel("% Unique")
+    # axs[1].legend([], [], frameon=False)
+    # plt.show()
 
     # ----------------- #
 
@@ -181,30 +190,55 @@ def plots(param_name, scores):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="selectivity", hue="algorithm", data=scores, ax=axs[0])
-    axs[0].set_title(f"Selectivity")
+    sns.barplot(
+        x=param_name, y="total_options", hue="algorithm", data=scores, ax=axs[0]
+    )
+    axs[0].set_title(f"Total options")
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(
-        x=param_name,
-        y="selectivity_to_P_ratio",
-        hue="algorithm",
-        data=scores,
-        ax=axs[1],
+        x=param_name, y="valid_options", hue="algorithm", data=scores, ax=axs[1]
     )
-    axs[1].set_title(f"Selectivity Ratio compared to P's")
-    # axs[1].legend(fontsize="x-small")
+    axs[1].set_title(f"Valid options")
     axs[1].legend([], [], frameon=False)
-
-    # sns.barplot(x=param_name, y="rows", hue="algorithm", data=scores, ax=axs[2])
-    # axs[2].set_title(f"Rows")
-    # axs[2].legend([], [], frameon=False)
-    plt.show()
 
     # ----------------- #
 
-    sns.barplot(x=param_name, y="execution_time", hue="algorithm", data=scores)
-    plt.ylabel("Execution Time (s)")
-    plt.title(f"Execution time (lower is better)")
-    plt.legend(fontsize="x-small")
-    plt.show()
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    sns.barplot(
+        x=param_name, y="validate_time", hue="algorithm", data=scores, ax=axs[0]
+    )
+    axs[0].set_title(f"Validation Time")
+    axs[0].legend(fontsize="x-small")
+
+    sns.barplot(x=param_name, y="scan_time", hue="algorithm", data=scores, ax=axs[1])
+    axs[1].set_title(f"Scan time")
+    axs[1].legend([], [], frameon=False)
+
+
+def debug(cate_model):
+    D = Data()
+    D.generate()
+
+    alg = cate_model(D)
+    start = time()
+    alg.fit()
+    end = round(time() - start, 2)
+    print(f"[{alg.algorithm}] Offline time: {end}")
+
+    cond, s = D.generate_random_condition()
+    print("User condition:", cond, "Selectivity:", s)
+
+    start = time()
+    valid_options = alg.online()
+    end = round(time() - start, 2)
+    print(
+        f"[{alg.algorithm}] Online time: {end}, Total Splits: {len(alg.options)}, Valid: {len(valid_options)}"
+    )
+
+    start = time()
+    top = D.get_topK(options=valid_options)
+    end = round(time() - start, 2)
+    print(f"[{alg.algorithm}] get topK in {end}")
+
+    return top
