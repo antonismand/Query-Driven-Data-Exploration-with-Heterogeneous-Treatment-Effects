@@ -7,16 +7,20 @@ import matplotlib.pyplot as plt
 from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
 from sklearn.ensemble import RandomForestClassifier
 
+from trees.scanners import Greedy
+
 
 class CF:
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
         self.D = D
         self.df = D.df
-        self.algorithm = "CF"
+        self.scan_method = scan_method
+        self.algorithm = "CF" + f" ({scan_method.__name__})"
 
     def fit(
         self,
+        parse_depth=8,
         criterion="mse",
         n_estimators=100,
         tune=False,
@@ -26,7 +30,7 @@ class CF:
         min_samples_leaf=5,
         max_features="auto",
     ):
-
+        self.parse_depth = parse_depth
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
@@ -55,20 +59,13 @@ class CF:
         )
 
         for tree in self.forest.model_cate.estimators_[0]:
-            self.parse_tree(tree.tree_, max_depth=max_depth)
+            self.parse_tree(tree.tree_)
 
     def online(self):
-        return self.D.get_valid_subgroups(self.options)
+        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
 
     def parse_tree(
-        self,
-        tree,
-        node_id=0,
-        parent_id=None,
-        left=False,
-        prev_conditions="",
-        depth=0,
-        max_depth=100,
+        self, tree, node_id=0, parent_id=None, left=False, prev_conditions="", depth=0
     ):
 
         cate = round(tree.value[node_id][0][0], 3)
@@ -91,7 +88,7 @@ class CF:
                 }
             )
 
-        if tree.children_left[node_id] != -1 and depth < max_depth:
+        if tree.children_left[node_id] != -1 and depth < self.parse_depth:
             self.parse_tree(
                 tree=tree,
                 node_id=tree.children_left[node_id],
@@ -99,7 +96,6 @@ class CF:
                 left=True,
                 prev_conditions=full_condition,
                 depth=depth + 1,
-                max_depth=max_depth,
             )
             self.parse_tree(
                 tree=tree,
@@ -108,7 +104,6 @@ class CF:
                 left=False,
                 prev_conditions=full_condition,
                 depth=depth + 1,
-                max_depth=max_depth,
             )
 
     def get_important_features(self, threshold=0.01):
@@ -121,25 +116,27 @@ class CF:
 
 
 class CFT(CF):
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
         self.df = D.df
         self.D = D
-        self.algorithm = "CF SingleTree"
+        self.scan_method = scan_method
+        self.algorithm = "CF SingleTree" + f" ({scan_method.__name__})"
 
     def fit(
         self,
+        parse_depth=8,
         criterion="mse",
         n_estimators=100,
         tune=False,
         max_depth=100,
         cv=2,
-        min_samples_split=10,
-        min_samples_leaf=5,
+        min_samples_split=100,
+        min_samples_leaf=50,
         max_features="auto",
         print_tree=False,
     ):
-
+        self.parse_depth = parse_depth
         forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
@@ -182,7 +179,7 @@ class CFT(CF):
         self.parse_tree(final_tree)
 
     def online(self):
-        return self.D.get_valid_subgroups(self.options)
+        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
 
 
 def parameter_tuning(param_name, param_values, iterations=10):

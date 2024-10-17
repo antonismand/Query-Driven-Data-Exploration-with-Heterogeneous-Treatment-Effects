@@ -2,20 +2,21 @@ from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
 from trees.data import Data
+from trees.scanners import Greedy
 
 
 class CT:
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
         self.D = D
-
-        self.algorithm = "CT on D"
         self.df = D.df
+        self.scan_method = scan_method
+        self.algorithm = "CT on D" + f" ({scan_method.__name__})"
 
-    def fit(self, max_depth=100):
-        self.max_depth = max_depth
+    def fit(self, parse_depth=8, max_depth=100, min_samples_leaf=50):
+        self.parse_depth = parse_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
-            groups_cnt=True, max_depth=max_depth
+            groups_cnt=True, max_depth=max_depth, min_samples_leaf=min_samples_leaf
         )
         self.ctree.fit(
             X=self.df[self.D.feature_names].to_numpy(),
@@ -23,10 +24,10 @@ class CT:
             treatment=self.df["treatment"].to_numpy(),
         )
         self.tree = self.ctree.tree_
-        self.parse_tree(max_depth=max_depth)
+        self.parse_tree()
 
     def online(self):
-        return self.D.get_valid_subgroups(self.options)
+        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(20, 20))
@@ -41,7 +42,6 @@ class CT:
         left=False,
         prev_conditions="",
         depth=0,
-        max_depth=100,
         print_tree=False,
     ):
 
@@ -72,14 +72,13 @@ class CT:
             if print_tree:
                 print(rf"Root $\hat{{\tau}}(x)$: {cate}")
 
-        if self.tree.children_left[node_id] != -1 and depth < max_depth:
+        if self.tree.children_left[node_id] != -1 and depth < self.parse_depth:
             self.parse_tree(
                 node_id=self.tree.children_left[node_id],
                 parent_id=node_id,
                 left=True,
                 prev_conditions=full_condition,
                 depth=depth + 1,
-                max_depth=max_depth,
                 print_tree=print_tree,
             )
             self.parse_tree(
@@ -88,33 +87,31 @@ class CT:
                 left=False,
                 prev_conditions=full_condition,
                 depth=depth + 1,
-                max_depth=max_depth,
                 print_tree=print_tree,
             )
 
 
 class CTP(CT):
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
         self.D = D
+        self.scan_method = scan_method
+        self.algorithm = "CT on P" + f" ({scan_method.__name__})"
 
-        self.algorithm = "CT on P"
-
-    def fit(self):
-        pass
+    def fit(self, parse_depth=8, max_depth=100, min_samples_leaf=50):
+        self.parse_depth = parse_depth
+        self.max_depth = max_depth
+        self.min_samples_leaf = min_samples_leaf
 
     def online(self):
         if self.D.p is None:
             raise ValueError("P is not set")
 
         self.df = self.D.q_df
-        self.ctree: CausalTreeRegressor = CausalTreeRegressor(groups_cnt=True)
-        self.ctree.fit(
-            X=self.df[self.D.feature_names].to_numpy(),
-            y=self.df["outcome"].to_numpy(),
-            treatment=self.df["treatment"].to_numpy(),
+        self.options = []
+        super().fit(
+            parse_depth=self.parse_depth,
+            max_depth=self.max_depth,
+            min_samples_leaf=self.min_samples_leaf,
         )
-        self.tree = self.ctree.tree_
-
-        self.parse_tree()
-        return self.D.get_valid_subgroups(self.options)
+        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)

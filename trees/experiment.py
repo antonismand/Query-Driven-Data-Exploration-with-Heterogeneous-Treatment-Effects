@@ -11,6 +11,7 @@ from IPython.display import clear_output
 from trees.causal_forest import CF, CFT
 from trees.causal_tree import CT, CTP
 from trees.data import Data
+from trees.scanners import Exhaustive, Greedy
 
 
 class Experiment:
@@ -68,18 +69,16 @@ class Experiment:
 
                         for alg in algorithms:
                             start = time()
-                            valid_options = alg.online()
+                            alg.online()
                             end = round(time() - start, 2)
                             print(
-                                f"[{alg.algorithm}] Online time: {end}s, Total Splits: {len(alg.options)}, Valid: {len(valid_options)}"
+                                f"[{alg.algorithm}] Online time: {end}s, Total Splits: {len(alg.options)}, Valid: {len(alg.valid_options)}"
                             )
 
                             for topK_values in product(*topK_params.values()):
                                 topK_dict = dict(zip(topK_keys, topK_values))
                                 start = time()
-                                score = data.get_topK(
-                                    options=valid_options, **topK_dict
-                                )
+                                score = data.get_topK(alg=alg, **topK_dict)
                                 end = round(time() - start, 2)
                                 print(
                                     f"[{alg.algorithm}] get topK in {end}s - {str(topK_dict)}"
@@ -112,10 +111,12 @@ class Experiment:
 
     def get_algorithms(self, data):
         return [
-            CT(data),
-            CTP(data),
+            CT(data, scan_method=Greedy),
+            # CT(data, scan_method=Exhaustive),
+            CTP(data, scan_method=Greedy),
+            # CTP(data, scan_method=Exhaustive),
             # CF(data),
-            CFT(data),
+            CFT(data, scan_method=Greedy),
             # BruteForce(cf, oracle=False),
             # BruteForce(cf),
         ]
@@ -216,11 +217,11 @@ def plots(param_name, scores):
     axs[1].legend([], [], frameon=False)
 
 
-def debug(cate_model):
+def debug(cate_model, scanner):
     D = Data()
     D.generate()
 
-    alg = cate_model(D)
+    alg = cate_model(D=D, scan_method=scanner)
     start = time()
     alg.fit()
     end = round(time() - start, 2)
@@ -230,14 +231,13 @@ def debug(cate_model):
     print("User condition:", cond, "Selectivity:", s)
 
     start = time()
-    valid_options = alg.online()
+    alg.online()
     end = round(time() - start, 2)
     print(
-        f"[{alg.algorithm}] Online time: {end}, Total Splits: {len(alg.options)}, Valid: {len(valid_options)}"
+        f"[{alg.algorithm}] Online time: {end}, Total Splits: {len(alg.options)}, Valid: {len(alg.valid_options)}"
     )
-
     start = time()
-    top = D.get_topK(options=valid_options)
+    top = D.get_topK(alg=alg)
     end = round(time() - start, 2)
     print(f"[{alg.algorithm}] get topK in {end}")
 
