@@ -1,3 +1,4 @@
+from copy import deepcopy
 import itertools
 
 
@@ -11,7 +12,7 @@ def Greedy(D, subgroups: list, max_t: float):
     percentile_index = int(0.9 * total_subgroups)
     bottom_10th_percentile = subgroups[percentile_index]["t_est"]
 
-    top_subs = subgroups[: D.k].copy()
+    top_subs = deepcopy(subgroups[: D.k])
 
     top_subs, min_score, min_score_i, _ = D.compute_scores_for_subgroups(
         top_subs, max_t

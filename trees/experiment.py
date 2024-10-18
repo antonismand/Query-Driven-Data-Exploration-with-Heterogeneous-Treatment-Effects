@@ -64,8 +64,7 @@ class Experiment:
                             "-" * 10,
                         )
                         print("Generating random condition", condition_dict)
-                        cond, s = data.generate_random_condition(**condition_dict)
-                        print("User condition:", cond, "Selectivity:", s)
+                        data.generate_random_condition(**condition_dict)
 
                         for alg in algorithms:
                             start = time()
@@ -115,7 +114,7 @@ class Experiment:
             # CT(data, scan_method=Exhaustive),
             CTP(data, scan_method=Greedy),
             # CTP(data, scan_method=Exhaustive),
-            # CF(data),
+            CF(data, scan_method=Greedy),
             CFT(data, scan_method=Greedy),
             # BruteForce(cf, oracle=False),
             # BruteForce(cf),
@@ -227,8 +226,7 @@ def debug(cate_model, scanner):
     end = round(time() - start, 2)
     print(f"[{alg.algorithm}] Offline time: {end}")
 
-    cond, s = D.generate_random_condition()
-    print("User condition:", cond, "Selectivity:", s)
+    D.generate_random_condition()
 
     start = time()
     alg.online()

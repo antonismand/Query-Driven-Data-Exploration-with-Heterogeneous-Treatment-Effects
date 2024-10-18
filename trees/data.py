@@ -4,7 +4,8 @@ import polars as pl
 import numpy as np
 import pandas as pd
 
-from trees.parser import Predicate
+from trees.parser import Predicate, format_interval
+from copy import deepcopy
 
 
 class Data:
@@ -69,7 +70,7 @@ class Data:
     def generate_random_condition(self, min_s=0.3, max_s=0.95):
         while True:
             p = np.random.choice(self.feature_names)
-            threshold = np.random.uniform(self.df[p].min(), self.df[p].max())
+            threshold = round(np.random.uniform(self.df[p].min(), self.df[p].max()), 3)
 
             if np.random.choice([True, False]):
                 cond = "<="
@@ -82,7 +83,7 @@ class Data:
 
             if s > min_s and s < max_s:
                 self.user_condition(full_cond)
-                # print("User condition:", full_cond, "Selectivity:", s)
+                print("User condition:", full_cond, "Selectivity:", s)
                 return full_cond, s
 
     def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
@@ -107,7 +108,7 @@ class Data:
         n_options = len(alg.valid_options)
 
         start = time()
-        subgroups = alg.scan_method(self, alg.valid_options, alg.max_t)
+        subgroups = alg.scan_method(self, deepcopy(alg.valid_options), alg.max_t)
         end = time()
         scan_time = round(end - start, 2)
         # print(scan_method.__name__, "time:", scan_time)
@@ -115,7 +116,10 @@ class Data:
         for s in subgroups:
 
             s["t"] = self.CATE(s["condition"])
-
+            comb = " AND ".join(
+                [f"{k} ∈ {format_interval(v)}" for k, v in s["combined"].items()]
+            )
+            s["combined"] = comb
             s["scan_method"] = alg.scan_method.__name__
             s["scan_time"] = scan_time
             s["valid_options"] = n_options
@@ -146,9 +150,6 @@ class Data:
                 df = self.execute(r)
                 if df.shape[0] > min_rows:
                     opt["rows"] = df.shape[0]
-                    # opt["combined"] = " AND ".join(
-                    #     [f"{k} ∈ {format_interval(v)}" for k, v in s.combined.items()]
-                    # )
                     opt["total_options"] = n_options
                     accepted_subgroups.append(opt)
                     if opt["t_est"] > max_t:
