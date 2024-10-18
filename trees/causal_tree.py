@@ -1,6 +1,7 @@
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
+from sympy import Interval, oo
 from trees.data import Data
 from trees.scanners import Greedy
 
@@ -41,6 +42,7 @@ class CT:
         parent_id=None,
         left=False,
         prev_conditions="",
+        prev_combined: dict[str, Interval] = {},
         depth=0,
         print_tree=False,
     ):
@@ -48,11 +50,25 @@ class CT:
         cate = round(self.tree.value[node_id][1][0] - self.tree.value[node_id][0][0], 3)
 
         full_condition = ""
+        combined = prev_combined.copy()
 
         if parent_id is not None:
-            cond = "<=" if left else ">"
+            # cond = "<=" if left else ">"
+            num = round(self.tree.threshold[parent_id], 3)
+            if left:
+                cond = "<="
+                interval = Interval(-oo, num)
+            else:
+                cond = ">"
+                interval = Interval.Lopen(num, oo)
 
-            full_condition = f"feature_{self.tree.feature[parent_id]} {cond} {round(self.tree.threshold[parent_id],3)}"
+            feature = "feature_" + str(self.tree.feature[parent_id])
+            if feature in combined:
+                combined[feature] = combined[feature].intersection(interval)
+            else:
+                combined[feature] = interval
+
+            full_condition = f"{feature} {cond} {num}"
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
@@ -61,6 +77,8 @@ class CT:
             self.options.append(
                 {
                     "condition": full_condition,
+                    "combined": combined,
+                    "features": len(combined),
                     "t_est": abs(cate),
                     "T0": round(self.tree.value[node_id][0][0], 2),
                     "T1": round(self.tree.value[node_id][1][0], 2),
@@ -78,6 +96,7 @@ class CT:
                 parent_id=node_id,
                 left=True,
                 prev_conditions=full_condition,
+                prev_combined=combined,
                 depth=depth + 1,
                 print_tree=print_tree,
             )
@@ -86,6 +105,7 @@ class CT:
                 parent_id=node_id,
                 left=False,
                 prev_conditions=full_condition,
+                prev_combined=combined,
                 depth=depth + 1,
                 print_tree=print_tree,
             )

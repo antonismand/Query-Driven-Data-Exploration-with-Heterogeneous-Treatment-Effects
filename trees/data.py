@@ -4,9 +4,7 @@ import polars as pl
 import numpy as np
 import pandas as pd
 
-from trees.causal_tree import CT
-from trees.parser import Predicate, format_interval
-from trees.scanners import Greedy
+from trees.parser import Predicate
 
 
 class Data:
@@ -63,6 +61,7 @@ class Data:
     def user_condition(self, p: str):
         self.p = p
         self.q_df = self.execute(p, on="D")
+        self.pp = Predicate(p)
 
     def calculate_selectivity(self, condition: str):
         return self.execute(condition).shape[0] / self.df.shape[0]
@@ -71,8 +70,12 @@ class Data:
         while True:
             p = np.random.choice(self.feature_names)
             threshold = np.random.uniform(self.df[p].min(), self.df[p].max())
-            left = np.random.choice([True, False])
-            cond = "<=" if left else ">"
+
+            if np.random.choice([True, False]):
+                cond = "<="
+            else:
+                cond = ">"
+
             full_cond = f"{p} {cond} {threshold}"
 
             s = self.calculate_selectivity(full_cond)
@@ -94,7 +97,7 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def get_topK(self, alg=CT, w=0.5, k=5):
+    def get_topK(self, alg, w=0.5, k=5):
         if self.p is None:
             raise ValueError("no P given")
 
@@ -136,19 +139,16 @@ class Data:
 
         max_t = 0
 
-        pp = Predicate(f"select * from x where {self.p}")
         accepted_subgroups = []
         for opt in options:
-            s = Predicate("select * from x where " + opt["condition"], combine=True)
-            if s.satisfies(pp):
+            if self.pp.includes(opt["combined"]):
                 r = f"{self.p} AND {opt['condition']}"
                 df = self.execute(r)
                 if df.shape[0] > min_rows:
                     opt["rows"] = df.shape[0]
-                    opt["combined"] = " AND ".join(
-                        [f"{k} ∈ {format_interval(v)}" for k, v in s.combined.items()]
-                    )
-                    opt["features"] = len(s.combined)
+                    # opt["combined"] = " AND ".join(
+                    #     [f"{k} ∈ {format_interval(v)}" for k, v in s.combined.items()]
+                    # )
                     opt["total_options"] = n_options
                     accepted_subgroups.append(opt)
                     if opt["t_est"] > max_t:

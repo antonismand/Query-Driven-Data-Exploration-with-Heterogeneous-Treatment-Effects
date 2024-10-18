@@ -1,13 +1,14 @@
+import re
 import sqlglot
 from sqlglot.expressions import And, Or, Condition, Paren, GT, LT, GTE, LTE, EQ, Between
 from sympy import Interval, oo
 
 
 class Predicate:
-    def __init__(self, sql_query, combine=False):
+    def __init__(self, p):
         self.conditions = []
         self.or_conditions = []
-        parsed = sqlglot.parse_one(sql_query)
+        parsed = sqlglot.parse_one(f"select * from x where {p}")
 
         if not "where" in parsed.args:
             raise Exception("No WHERE clause found")
@@ -16,9 +17,6 @@ class Predicate:
 
         # for i, cond in enumerate(self.conditions, 1):
         #     print(f"Requirement #{i}: {cond}")
-
-        if combine:
-            self.combine_intervals()
 
     def traverse_conditions(self, expression):
         if isinstance(expression, And):
@@ -64,24 +62,11 @@ class Predicate:
                 return {left: Interval(right, right)}
         return str(expression)
 
-    def combine_intervals(self):
-        self.combined: dict[str, Interval] = {}
+    def includes(self, combined: dict[str, Interval]):
         for cond in self.conditions:
-            if len(cond) != 1:
-                raise Exception("Cannot combine OR conditions")
-            for key, interval in cond[0].items():
-                if key in self.combined:
-                    self.combined[key] = self.combined[key].intersection(interval)
-                else:
-                    self.combined[key] = interval
-
-    def satisfies(self, p):
-        for cond in p.conditions:
             if len(cond) == 1:
                 for key, interval in cond[0].items():
-                    if key in self.combined and not self.combined[key].is_proper_subset(
-                        interval
-                    ):
+                    if key in combined and not combined[key].is_proper_subset(interval):
                         # print(f"{self.combined[key]} not in P: {interval}")
                         return False
             else:
@@ -89,9 +74,9 @@ class Predicate:
                 any_key_exists = False
                 for sub_cond in cond:
                     for key, interval in sub_cond.items():
-                        if key in self.combined:
+                        if key in combined:
                             any_key_exists = True
-                            if self.combined[key].is_proper_subset(interval):
+                            if combined[key].is_proper_subset(interval):
                                 any_satisfied = True
                                 break
 

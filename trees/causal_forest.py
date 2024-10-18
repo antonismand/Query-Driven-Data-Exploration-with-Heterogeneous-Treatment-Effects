@@ -1,5 +1,6 @@
 from econml.dml import CausalForestDML
 import pandas as pd
+from sympy import Interval, oo
 from tqdm import tqdm
 from trees.data import Data
 from econml.cate_interpreter import SingleTreeCateInterpreter
@@ -65,23 +66,47 @@ class CF:
         self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
 
     def parse_tree(
-        self, tree, node_id=0, parent_id=None, left=False, prev_conditions="", depth=0
+        self,
+        tree,
+        node_id=0,
+        parent_id=None,
+        left=False,
+        prev_conditions="",
+        prev_combined: dict[str, Interval] = {},
+        depth=0,
     ):
 
         cate = round(tree.value[node_id][0][0], 3)
 
         full_condition = ""
+        combined = prev_combined.copy()
 
         if parent_id is not None:
-            cond = "<=" if left else ">"
+            # cond = "<=" if left else ">"
+            num = round(tree.threshold[parent_id], 3)
+            if left:
+                cond = "<="
+                interval = Interval(-oo, num)
+            else:
+                cond = ">"
+                interval = Interval.Lopen(num, oo)
 
-            full_condition = f"feature_{tree.feature[parent_id]} {cond} {round(tree.threshold[parent_id],3)}"
+            feature = "feature_" + str(tree.feature[parent_id])
+
+            if feature in combined:
+                combined[feature] = combined[feature].intersection(interval)
+            else:
+                combined[feature] = interval
+
+            full_condition = f"{feature} {cond} {num}"
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
             self.options.append(
                 {
                     "condition": full_condition,
+                    "combined": combined,
+                    "features": len(combined),
                     "t_est": abs(cate),
                     "depth": depth,
                     "algorithm": self.algorithm,
@@ -95,6 +120,7 @@ class CF:
                 parent_id=node_id,
                 left=True,
                 prev_conditions=full_condition,
+                prev_combined=combined,
                 depth=depth + 1,
             )
             self.parse_tree(
@@ -103,6 +129,7 @@ class CF:
                 parent_id=node_id,
                 left=False,
                 prev_conditions=full_condition,
+                prev_combined=combined,
                 depth=depth + 1,
             )
 
