@@ -7,8 +7,16 @@ from econml.cate_interpreter import SingleTreeCateInterpreter
 import matplotlib.pyplot as plt
 from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
 from sklearn.ensemble import RandomForestClassifier
-
 from trees.scanners import Greedy
+
+
+CRITERION = "mse"
+N_ESTIMATORS = 64
+MAX_DEPTH = 8
+CV = 2
+MIN_SAMPLES_SPLIT = 50
+MIN_SAMPLES_LEAF = 30
+MAX_FEATURES = "auto"
 
 
 class CF:
@@ -21,15 +29,15 @@ class CF:
 
     def fit(
         self,
-        parse_depth=8,
-        criterion="mse",
-        n_estimators=100,
+        parse_depth=100,
+        criterion=CRITERION,
+        n_estimators=N_ESTIMATORS,
         tune=False,
-        max_depth=100,
-        cv=2,
-        min_samples_split=10,
-        min_samples_leaf=5,
-        max_features="auto",
+        max_depth=MAX_DEPTH,
+        cv=CV,
+        min_samples_split=MIN_SAMPLES_SPLIT,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
+        max_features=MAX_FEATURES,
     ):
         self.parse_depth = parse_depth
         self.forest: CausalForestDML = CausalForestDML(
@@ -152,15 +160,15 @@ class CFT(CF):
 
     def fit(
         self,
-        parse_depth=8,
-        criterion="mse",
-        n_estimators=100,
+        parse_depth=100,
+        criterion=CRITERION,
+        n_estimators=N_ESTIMATORS,
         tune=False,
-        max_depth=100,
-        cv=2,
-        min_samples_split=100,
-        min_samples_leaf=50,
-        max_features="auto",
+        max_depth=MAX_DEPTH,
+        cv=CV,
+        min_samples_split=MIN_SAMPLES_SPLIT,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
+        max_features=MAX_FEATURES,
         print_tree=False,
     ):
         self.parse_depth = parse_depth
@@ -216,23 +224,23 @@ def parameter_tuning(param_name, param_values, iterations=10):
     for p in param_values:
         print(f"{param_name}: {p}")
         for exp in tqdm(range(iterations)):
-            data = Data()
-            data.generate(seed=exp)
-            data.generate_random_condition()
 
-            cf = CF(data)
+            D = Data()
+            D.generate(seed=exp)
+            D.generate_random_condition(print_condition=False)
+
+            cf = CF(D)
             cf.fit(**{param_name: p})
+            cf.online()
+            score = D.get_topK(alg=cf)
+            score[param_name] = p
+            scores = pd.concat([scores, score], ignore_index=True)
 
-            cft = CFT(cf)
-            if param_name in ["max_depth", "min_samples_leaf"]:
-                cft.fit(**{param_name: p})
-            else:
-                cft.fit()
-
-            for alg in [cf, cft]:
-                alg.online()
-                score = data.get_topK(alg)
-                score[param_name] = p
-                scores = pd.concat([scores, score], ignore_index=True)
+            cft = CFT(D)
+            cft.fit(**{param_name: p})
+            cft.online()
+            score = D.get_topK(alg=cft)
+            score[param_name] = p
+            scores = pd.concat([scores, score], ignore_index=True)
 
     plots(param_name, scores)

@@ -67,7 +67,7 @@ class Data:
     def calculate_selectivity(self, condition: str):
         return self.execute(condition).shape[0] / self.df.shape[0]
 
-    def generate_random_condition(self, min_s=0.3, max_s=0.95):
+    def generate_random_condition(self, min_s=0.3, max_s=0.95, print_condition=True):
         while True:
             p = np.random.choice(self.feature_names)
             threshold = round(np.random.uniform(self.df[p].min(), self.df[p].max()), 3)
@@ -83,7 +83,8 @@ class Data:
 
             if s > min_s and s < max_s:
                 self.user_condition(full_cond)
-                print("User condition:", full_cond, "Selectivity:", s)
+                if print_condition:
+                    print("User condition:", full_cond, "Selectivity:", s)
                 return full_cond, s
 
     def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
