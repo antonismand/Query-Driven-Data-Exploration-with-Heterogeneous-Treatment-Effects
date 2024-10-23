@@ -1,6 +1,5 @@
 from econml.dml import CausalForestDML
 import pandas as pd
-from sympy import Interval, oo
 from tqdm import tqdm
 from trees.data import Data
 from econml.cate_interpreter import SingleTreeCateInterpreter
@@ -70,6 +69,8 @@ class CF:
         for tree in self.forest.model_cate.estimators_[0]:
             self.parse_tree(tree.tree_)
 
+        self.op_matrix = self.D.compute_overlap_matrix(self.options)
+
     def online(self):
         self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
 
@@ -80,7 +81,7 @@ class CF:
         parent_id=None,
         left=False,
         prev_conditions="",
-        prev_combined: dict[str, Interval] = {},
+        prev_combined: dict[str, tuple] = {},
         depth=0,
     ):
 
@@ -92,17 +93,18 @@ class CF:
         if parent_id is not None:
             # cond = "<=" if left else ">"
             num = round(tree.threshold[parent_id], 3)
+            feature = "feature_" + str(tree.feature[parent_id])
             if left:
                 cond = "<="
-                interval = Interval(-oo, num)
+                interval = (self.D.min_max[feature][0], num)
             else:
                 cond = ">"
-                interval = Interval.Lopen(num, oo)
-
-            feature = "feature_" + str(tree.feature[parent_id])
+                interval = (num, self.D.min_max[feature][1])
 
             if feature in combined:
-                combined[feature] = combined[feature].intersection(interval)
+                combined[feature] = self.D.intersection_range(
+                    combined[feature], interval
+                )
             else:
                 combined[feature] = interval
 
@@ -112,6 +114,7 @@ class CF:
 
             self.options.append(
                 {
+                    "id": len(self.options),
                     "condition": full_condition,
                     "combined": combined,
                     "features": len(combined),
@@ -212,6 +215,7 @@ class CFT(CF):
 
         final_tree = intrp.tree_model_.tree_
         self.parse_tree(final_tree)
+        self.op_matrix = self.D.compute_overlap_matrix(self.options)
 
     def online(self):
         self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)

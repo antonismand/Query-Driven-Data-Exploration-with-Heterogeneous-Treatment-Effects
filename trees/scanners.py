@@ -1,47 +1,65 @@
 from copy import deepcopy
 import itertools
+from math import comb
+
+from tqdm import tqdm
 
 
-def Greedy(D, subgroups: list, max_t: float):
+def Greedy(D, subgroups: list, max_t: float, op_matrix: list):
     if len(subgroups) <= D.k:
         return subgroups
 
     subgroups = sorted(subgroups, key=lambda x: x["t_est"], reverse=True)
+    max_t = subgroups[0]["t_est"]
 
     total_subgroups = len(subgroups)
     percentile_index = int(0.9 * total_subgroups)
     bottom_10th_percentile = subgroups[percentile_index]["t_est"]
-
-    top_subs = deepcopy(subgroups[: D.k])
-
-    top_subs, min_score, min_score_i, _ = D.compute_scores_for_subgroups(
-        top_subs, max_t
-    )
-
     theta = bottom_10th_percentile
     i = D.k + 1
 
-    while i < total_subgroups and subgroups[i]["t_est"] > theta:
-        score_si = D.compute_score_for_subgroup(
-            top_subgroups=top_subs, s=subgroups[i], max_t=max_t
+    top_subs = deepcopy(subgroups[: D.k])
+    scores = []
+
+    for top in top_subs:
+        top = D.compute_score_for_subgroup(
+            top_subgroups=top_subs, s=top, max_t=max_t, op_matrix=op_matrix
         )
-        if score_si > min_score:
-            top_subs.pop(min_score_i)
-            top_subs.append(subgroups[i])
-            top_subs, min_score, min_score_i, _ = D.compute_scores_for_subgroups(
-                top_subs, max_t
-            )
+        scores.append(top["score"])
+
+    min_score = min(scores)
+    min_score_idx = scores.index(min_score)
+
+    while i < total_subgroups and subgroups[i]["t_est"] > theta:
+        candidate_sub = D.compute_score_for_subgroup(
+            top_subgroups=top_subs, s=subgroups[i], max_t=max_t, op_matrix=op_matrix
+        )
+
+        if candidate_sub["score"] > min_score:
+            top_subs.pop(min_score_idx)
+            top_subs.append(candidate_sub)
+
+            scores.pop(min_score_idx)
+            scores.append(candidate_sub["score"])
+
+            min_score = min(scores)
+            min_score_idx = scores.index(min_score)
+
         i += 1
 
     return top_subs
 
 
-def Exhaustive(D, subgroups: list, max_t: float):
+def Exhaustive(D, subgroups: list, max_t: float, op_matrix: list):
     best_score = 0
     best_subs = None
 
-    for candidates in itertools.combinations(subgroups, D.k):
-        subs, _, _, score = D.compute_scores_for_subgroups(list(candidates), max_t)
+    n_subgroups = len(subgroups)
+
+    for candidates in tqdm(
+        itertools.combinations(subgroups, D.k), total=comb(n_subgroups, D.k)
+    ):
+        subs, score = D.compute_scores_for_subgroups(list(candidates), max_t, op_matrix)
         if score > best_score:
             best_score = score
             best_subs = subs

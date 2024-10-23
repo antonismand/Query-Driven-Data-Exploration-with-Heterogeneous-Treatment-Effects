@@ -1,7 +1,6 @@
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
-from sympy import Interval, oo
 from trees.data import Data
 from trees.scanners import Greedy
 
@@ -14,7 +13,7 @@ class CT:
         self.scan_method = scan_method
         self.algorithm = "CT on D" + f" ({scan_method.__name__})"
 
-    def fit(self, parse_depth=8, max_depth=100, min_samples_leaf=50):
+    def fit(self, parse_depth=100, max_depth=8, min_samples_leaf=50):
         self.parse_depth = parse_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth, min_samples_leaf=min_samples_leaf
@@ -26,6 +25,7 @@ class CT:
         )
         self.tree = self.ctree.tree_
         self.parse_tree()
+        self.op_matrix = self.D.compute_overlap_matrix(self.options)
 
     def online(self):
         self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
@@ -42,7 +42,7 @@ class CT:
         parent_id=None,
         left=False,
         prev_conditions="",
-        prev_combined: dict[str, Interval] = {},
+        prev_combined: dict[str, tuple] = {},
         depth=0,
         print_tree=False,
     ):
@@ -54,17 +54,19 @@ class CT:
 
         if parent_id is not None:
             # cond = "<=" if left else ">"
+            feature = "feature_" + str(self.tree.feature[parent_id])
             num = round(self.tree.threshold[parent_id], 3)
             if left:
                 cond = "<="
-                interval = Interval(-oo, num)
+                interval = (self.D.min_max[feature][0], num)
             else:
                 cond = ">"
-                interval = Interval.Lopen(num, oo)
+                interval = (num, self.D.min_max[feature][1])
 
-            feature = "feature_" + str(self.tree.feature[parent_id])
             if feature in combined:
-                combined[feature] = combined[feature].intersection(interval)
+                combined[feature] = self.D.intersection_range(
+                    combined[feature], interval
+                )
             else:
                 combined[feature] = interval
 
@@ -76,6 +78,7 @@ class CT:
                 print(f"{depth * '  '}{full_condition},  CATE: {cate}")
             self.options.append(
                 {
+                    "id": len(self.options),
                     "condition": full_condition,
                     "combined": combined,
                     "features": len(combined),
@@ -118,7 +121,7 @@ class CTP(CT):
         self.scan_method = scan_method
         self.algorithm = "CT on P" + f" ({scan_method.__name__})"
 
-    def fit(self, parse_depth=8, max_depth=100, min_samples_leaf=50):
+    def fit(self, parse_depth=100, max_depth=8, min_samples_leaf=50):
         self.parse_depth = parse_depth
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf

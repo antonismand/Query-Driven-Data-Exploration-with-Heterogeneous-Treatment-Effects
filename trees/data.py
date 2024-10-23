@@ -4,7 +4,10 @@ import polars as pl
 import numpy as np
 import pandas as pd
 
-from trees.parser import Predicate, format_interval
+
+from tqdm import tqdm
+
+from trees.parser import Predicate
 from copy import deepcopy
 
 
@@ -43,6 +46,14 @@ class Data:
 
         self.df = pl.DataFrame(df)
 
+        min_values = df[self.feature_names].min()
+        max_values = df[self.feature_names].max()
+
+        self.min_max = {
+            column: (round(min_values[column], 3), round(max_values[column], 3))
+            for column in self.feature_names
+        }
+
         return df.describe()
 
     def execute(self, condition: str, on="D"):
@@ -62,7 +73,7 @@ class Data:
     def user_condition(self, p: str):
         self.p = p
         self.q_df = self.execute(p, on="D")
-        self.pp = Predicate(p)
+        self.pp = Predicate(p, self)
 
     def calculate_selectivity(self, condition: str):
         return self.execute(condition).shape[0] / self.df.shape[0]
@@ -109,7 +120,9 @@ class Data:
         n_options = len(alg.valid_options)
 
         start = time()
-        subgroups = alg.scan_method(self, deepcopy(alg.valid_options), alg.max_t)
+        subgroups = alg.scan_method(
+            self, deepcopy(alg.valid_options), alg.max_t, alg.op_matrix
+        )
         end = time()
         scan_time = round(end - start, 2)
         # print(scan_method.__name__, "time:", scan_time)
@@ -117,10 +130,10 @@ class Data:
         for s in subgroups:
 
             s["t"] = self.CATE(s["condition"])
-            comb = " AND ".join(
-                [f"{k} ∈ {format_interval(v)}" for k, v in s["combined"].items()]
-            )
-            s["combined"] = comb
+            # comb = " AND ".join(
+            #     [f"{k} ∈ {format_interval(v)}" for k, v in s["combined"].items()]
+            # )
+            # s["combined"] = comb
             s["scan_method"] = alg.scan_method.__name__
             s["scan_time"] = scan_time
             s["valid_options"] = n_options
@@ -162,38 +175,85 @@ class Data:
 
         return accepted_subgroups, max_t
 
-    def compute_scores_for_subgroups(self, subgroups: list, max_t: float):
+    def compute_scores_for_subgroups(
+        self, subgroups: list, max_t: float, op_matrix: list
+    ):
 
-        min_score = 999999994299999999
-        min_score_i = -1
         total_score = 0
 
         for i, s1 in enumerate(subgroups):
             overlap = 0
             for j, s2 in enumerate(subgroups):
                 if i != j:
-                    overlap += self.jaccard_over_preds(s1["condition"], s2["condition"])
+                    overlap += op_matrix[s1["id"]][s2["id"]]
 
             s1["overlap"] = overlap / self.k
             s1["score"] = self.w * s1["t_est"] / max_t + (1 - self.w) * (
                 1 - s1["overlap"]
             )
             total_score += s1["score"]
-            if s1["score"] < min_score:
-                min_score = s1["score"]
-                min_score_i = i
 
-        return subgroups, min_score, min_score_i, total_score
+        return subgroups, total_score
 
-    def compute_score_for_subgroup(self, top_subgroups: list, s, max_t: float):
-        s_overlap = (
-            sum(
-                [
-                    self.jaccard_over_preds(top_sub["condition"], s["condition"])
-                    for top_sub in top_subgroups
-                ]
-            )
+    def compute_score_for_subgroup(
+        self, top_subgroups: list, s, max_t: float, op_matrix: list
+    ):
+        overlap = (
+            sum([op_matrix[top_sub["id"]][s["id"]] for top_sub in top_subgroups])
             / self.k
         )
 
-        return self.w * s["t_est"] / max_t + (1 - self.w) * (1 - s_overlap)
+        s["overlap"] = overlap
+        s["score"] = self.w * s["t_est"] / max_t + (1 - self.w) * (1 - overlap)
+
+        return s
+
+    def compute_overlap_matrix(self, options):
+        n_options = len(options)
+        op_matrix = [[0] * n_options] * n_options
+        for i in tqdm(range(n_options)):
+            for j in range(i, n_options):
+                if i == j:
+                    op_matrix[i][j] = 1
+                else:
+                    overlap = self.jaccard(
+                        options[i]["combined"], options[j]["combined"]
+                    )
+                    op_matrix[i][j] = overlap
+                    op_matrix[j][i] = overlap
+        return op_matrix
+
+    def intersection_range(self, interval1: tuple, interval2: tuple):
+        return (max(interval1[0], interval2[0]), min(interval1[1], interval2[1]))
+
+    def is_subset(self, superset: tuple, subset: tuple):
+        return superset[0] <= subset[0] and superset[1] >= subset[1]
+
+    def intersection(self, interval1: tuple, interval2: tuple):
+        start = max(interval1[0], interval2[0])
+        end = min(interval1[1], interval2[1])
+        return end - start if start < end else 0
+
+    def jaccard_between_intervals(self, interval1: tuple, interval2: tuple):
+        intersection = self.intersection(interval1, interval2)
+        union = interval1[1] - interval1[0] + interval2[1] - interval2[0] - intersection
+        return intersection / union
+
+    def jaccard(self, c1: dict[str, tuple], c2: dict[str, tuple]):
+        common_keys = c1.keys() & c2.keys()
+        n_common = len(common_keys)
+
+        if n_common == 0:
+            return 0
+
+        total = 0
+        for common in common_keys:
+            overlap = 0
+            if c1[common] == c2[common]:
+                overlap = 1
+            else:
+                overlap = self.jaccard_between_intervals(c1[common], c2[common])
+
+            total += overlap
+
+        return total / n_common

@@ -111,11 +111,13 @@ class Experiment:
     def get_algorithms(self, data):
         return [
             CT(data, scan_method=Greedy),
-            # CT(data, scan_method=Exhaustive),
+            CT(data, scan_method=Exhaustive),
             CTP(data, scan_method=Greedy),
-            # CTP(data, scan_method=Exhaustive),
+            CTP(data, scan_method=Exhaustive),
             CF(data, scan_method=Greedy),
+            # CF(data, scan_method=Exhaustive),
             CFT(data, scan_method=Greedy),
+            # CFT(data, scan_method=Exhaustive),
             # BruteForce(cf, oracle=False),
             # BruteForce(cf),
         ]
