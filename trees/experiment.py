@@ -156,10 +156,10 @@ def plots(param_name, scores):
     # axs[0].set_ylabel("True Score")
     # axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
-    axs[1].set_title(f"Score")
-    axs[1].legend([], [], frameon=False)
-    plt.show()
+    # sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
+    # axs[1].set_title(f"Score")
+    # axs[1].legend([], [], frameon=False)
+    # plt.show()
 
     # ----------------- #
 
@@ -169,13 +169,10 @@ def plots(param_name, scores):
     axs[0].set_ylabel("overlap")
     axs[0].legend(fontsize="x-small")
 
-    # sns.barplot(
-    #     x=param_name, y="unique_between_K", hue="algorithm", data=scores, ax=axs[1]
-    # )
-    # axs[1].set_title(f"Unique between K")
-    # axs[1].set_ylabel("% Unique")
-    # axs[1].legend([], [], frameon=False)
-    # plt.show()
+    sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
+    axs[1].set_title(f"Score")
+    axs[1].legend([], [], frameon=False)
+    plt.show()
 
     # ----------------- #
 
@@ -218,11 +215,11 @@ def plots(param_name, scores):
     axs[1].legend([], [], frameon=False)
 
 
-def debug(cate_model, scanner):
+def debug(cate_model=CT, scanner=Greedy):
     D = Data()
     D.generate()
 
-    alg = cate_model(D=D, scan_method=scanner)
+    alg = cate_model(D=D)
     start = time()
     alg.fit()
     end = round(time() - start, 2)
@@ -237,7 +234,8 @@ def debug(cate_model, scanner):
         f"[{alg.algorithm}] Online time: {end}, Total Splits: {len(alg.options)}, Valid: {len(alg.valid_options)}"
     )
     start = time()
-    top = D.get_topK(alg=alg)
+    scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
+    top = scan.get_topK()
     end = round(time() - start, 2)
     print(f"[{alg.algorithm}] get topK in {end}")
 
