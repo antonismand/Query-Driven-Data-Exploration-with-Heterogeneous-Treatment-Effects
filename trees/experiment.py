@@ -11,7 +11,7 @@ from IPython.display import clear_output
 from trees.causal_forest import CF, CFT
 from trees.causal_tree import CT, CTP
 from trees.data import Data
-from trees.scanners import Exhaustive, Greedy
+from trees.scanners import Exhaustive, Greedy, Scanner
 
 
 class Experiment:
@@ -31,7 +31,7 @@ class Experiment:
         condition_params = self.get_signature(Data().generate_random_condition, kwargs)
         condition_keys = list(condition_params.keys())
 
-        topK_params = self.get_signature(Data().get_topK, kwargs)
+        topK_params = self.get_signature(Scanner([], [], None).get_topK, kwargs)
         topK_keys = list(topK_params.keys())
 
         for data_values in product(*data_params.values()):
@@ -77,7 +77,12 @@ class Experiment:
                             for topK_values in product(*topK_params.values()):
                                 topK_dict = dict(zip(topK_keys, topK_values))
                                 start = time()
-                                score = data.get_topK(alg=alg, **topK_dict)
+                                scan = alg.scan_method(
+                                    valid_subs=alg.valid_options,
+                                    op_matrix=alg.op_matrix,
+                                    D=data,
+                                )
+                                score = scan.get_topK(**topK_dict)
                                 end = round(time() - start, 2)
                                 print(
                                     f"[{alg.algorithm}] get topK in {end}s - {str(topK_dict)}"
@@ -111,9 +116,9 @@ class Experiment:
     def get_algorithms(self, data):
         return [
             CT(data, scan_method=Greedy),
-            CT(data, scan_method=Exhaustive),
+            # CT(data, scan_method=Exhaustive),
             CTP(data, scan_method=Greedy),
-            CTP(data, scan_method=Exhaustive),
+            # CTP(data, scan_method=Exhaustive),
             CF(data, scan_method=Greedy),
             # CF(data, scan_method=Exhaustive),
             CFT(data, scan_method=Greedy),
@@ -219,7 +224,7 @@ def debug(cate_model=CT, scanner=Greedy):
     D = Data()
     D.generate()
 
-    alg = cate_model(D=D)
+    alg = cate_model(D=D, scan_method=scanner)
     start = time()
     alg.fit()
     end = round(time() - start, 2)

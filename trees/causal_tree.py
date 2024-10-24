@@ -6,11 +6,12 @@ from trees.scanners import Greedy
 
 
 class CT:
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
         self.D = D
         self.df = D.df
-        self.algorithm = "CT on D"
+        self.scan_method = scan_method
+        self.algorithm = "CT on D" + f" ({scan_method.__name__})"
 
     def fit(self, parse_depth=100, max_depth=8, min_samples_leaf=50):
         self.parse_depth = parse_depth
@@ -114,10 +115,11 @@ class CT:
 
 
 class CTP(CT):
-    def __init__(self, D: Data):
+    def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
         self.D = D
-        self.algorithm = "CT on P"
+        self.scan_method = scan_method
+        self.algorithm = "CT on P" + f" ({scan_method.__name__})"
 
     def fit(self, parse_depth=100, max_depth=8, min_samples_leaf=50):
         self.parse_depth = parse_depth

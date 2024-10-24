@@ -9,8 +9,6 @@ from tqdm import tqdm
 
 class Scanner:
     def __init__(self, valid_subs: list, op_matrix: list, D):
-        if D.p is None:
-            raise ValueError("no P given")
 
         self.valid_subs = deepcopy(valid_subs)
         self.n_subs = len(valid_subs)
@@ -24,6 +22,9 @@ class Scanner:
         pass
 
     def get_topK(self, w=0.5, k=5):
+        if self.D.p is None:
+            raise ValueError("no P given")
+
         self.w = w
         self.k = k
 
@@ -35,7 +36,6 @@ class Scanner:
             s["t"] = self.D.CATE(s["condition"])
             s["scan_method"] = self.name
             s["scan_time"] = scan_time
-            s["algorithm"] += f" ({self.name})"
             s["valid_options"] = self.n_subs
             # s['true_score'] = w * s["t"] / self.max_t + (1 - w) * s["overlap_penalty"]
 
