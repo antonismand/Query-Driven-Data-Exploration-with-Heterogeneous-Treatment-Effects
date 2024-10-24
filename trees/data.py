@@ -224,7 +224,11 @@ class Data:
         return op_matrix
 
     def intersection_range(self, interval1: tuple, interval2: tuple):
-        return (max(interval1[0], interval2[0]), min(interval1[1], interval2[1]))
+        start = max(interval1[0], interval2[0])
+        end = min(interval1[1], interval2[1])
+        if start > end:
+            raise ValueError("No intersection")
+        return (start, end)
 
     def is_subset(self, superset: tuple, subset: tuple):
         return superset[0] <= subset[0] and superset[1] >= subset[1]

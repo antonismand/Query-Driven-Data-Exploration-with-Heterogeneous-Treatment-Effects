@@ -20,6 +20,7 @@ pandasql = "^0.7.3"
 polars = "^1.2.1"
 tqdm = "^4.66.4"
 sqlglot = "^25.24.5"
+pytest = "^8.3.3"
 
 
 [tool.poetry.group.dev.dependencies]

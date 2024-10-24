@@ -93,26 +93,3 @@ class Predicate:
 #     lower_bracket = "[" if interval.left_open is False else "("
 #     upper_bracket = "]" if interval.right_open is False else ")"
 #     return f"{lower_bracket}{lower_bound}, {upper_bound}{upper_bracket}"
-
-
-if __name__ == "__main__":
-    from trees.data import Data
-
-    predicates_to_test = [
-        "feature_0>5 AND feature_1>10",
-        "(feature_1 > 1 OR feature_2 < 3) AND feature_4 > 3 AND feature_5 > 3 AND feature_1 between 1 and 2 AND (feature_0 < 4 OR feature_0 > 5 OR feature_3 < 3)",
-    ]
-
-    D = Data()
-    D.generate()
-    for test in predicates_to_test:
-        parsed = Predicate(p=test, D=D)
-        print("------", test, "------")
-        for i, req in enumerate(parsed.conditions, 1):
-            formatted_conditions = []
-            for condition in req:
-                for feature, interval in condition.items():
-                    formatted_conditions.append(f"{feature} ∈ {interval}")
-            joined_conditions = " OR ".join(formatted_conditions)
-            pprint = f"Requirement #{i}: {joined_conditions}"
-            print(pprint)
