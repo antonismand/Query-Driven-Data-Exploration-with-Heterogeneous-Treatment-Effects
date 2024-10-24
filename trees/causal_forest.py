@@ -19,12 +19,11 @@ MAX_FEATURES = "auto"
 
 
 class CF:
-    def __init__(self, D: Data, scan_method=Greedy):
+    def __init__(self, D: Data):
         self.options = []
         self.D = D
         self.df = D.df
-        self.scan_method = scan_method
-        self.algorithm = "CF" + f" ({scan_method.__name__})"
+        self.algorithm = "CF"
 
     def fit(
         self,
@@ -154,12 +153,11 @@ class CF:
 
 
 class CFT(CF):
-    def __init__(self, D: Data, scan_method=Greedy):
+    def __init__(self, D: Data):
         self.options = []
         self.df = D.df
         self.D = D
-        self.scan_method = scan_method
-        self.algorithm = "CF SingleTree" + f" ({scan_method.__name__})"
+        self.algorithm = "CF SingleTree"
 
     def fit(
         self,

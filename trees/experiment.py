@@ -237,6 +237,6 @@ def debug(cate_model=CT, scanner=Greedy):
     scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
     top = scan.get_topK()
     end = round(time() - start, 2)
-    print(f"[{alg.algorithm}] get topK in {end}")
+    print(f"[{scan.name}] get topK in {end}")
 
     return top

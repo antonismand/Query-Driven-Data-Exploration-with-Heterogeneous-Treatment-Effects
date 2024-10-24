@@ -18,6 +18,7 @@ class Scanner:
         self.top_subs = []
         self.max_t = 0
         self.D = D
+        self.name = type(self).__name__
 
     def scan(self):
         pass
@@ -32,9 +33,9 @@ class Scanner:
 
         for s in self.top_subs:
             s["t"] = self.D.CATE(s["condition"])
-            s["scan_method"] = type(self).__name__
+            s["scan_method"] = self.name
             s["scan_time"] = scan_time
-            s["algorithm"] += f" ({type(self).__name__})"
+            s["algorithm"] += f" ({self.name})"
             s["valid_options"] = self.n_subs
             # s['true_score'] = w * s["t"] / self.max_t + (1 - w) * s["overlap_penalty"]
 
