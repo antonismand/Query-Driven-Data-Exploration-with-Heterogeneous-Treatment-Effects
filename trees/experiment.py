@@ -205,6 +205,7 @@ def plots(param_name, scores):
     )
     axs[1].set_title(f"Valid options")
     axs[1].legend([], [], frameon=False)
+    plt.show()
 
     # ----------------- #
 
@@ -218,6 +219,7 @@ def plots(param_name, scores):
     sns.barplot(x=param_name, y="scan_time", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Scan time")
     axs[1].legend([], [], frameon=False)
+    plt.show()
 
 
 def debug(cate_model=CT, scanner=Greedy):

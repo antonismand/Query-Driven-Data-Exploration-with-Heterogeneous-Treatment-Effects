@@ -40,6 +40,11 @@ class Data:
         self.max_t = df["ITE"].max()
         self.p = None
 
+        self.hte_features = ["feature_0", "feature_1"]
+        self.rest_features = [
+            f for f in self.feature_names if f not in self.hte_features
+        ]
+
         if override_p_with_2:
             self.feature_names = ["feature_0", "feature_1"]
             df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
@@ -79,13 +84,15 @@ class Data:
         return self.execute(condition).shape[0] / self.df.shape[0]
 
     def generate_random_condition(
-        self, min_s=0.3, max_s=0.95, hte_only=False, print_condition=True
+        self, min_s=0.3, max_s=0.95, features_in_P="all", print_condition=True
     ):
         while True:
-            if hte_only:
-                features = ["feature_0", "feature_1"]
-            else:
+            if features_in_P == "all":
                 features = self.feature_names
+            elif features_in_P == "hte_only":
+                features = self.hte_features
+            else:
+                features = self.rest_features
             p = np.random.choice(features)
             threshold = round(np.random.uniform(self.df[p].min(), self.df[p].max()), 3)
 
