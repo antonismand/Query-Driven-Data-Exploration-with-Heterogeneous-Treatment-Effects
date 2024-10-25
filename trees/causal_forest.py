@@ -236,7 +236,9 @@ def parameter_tuning(param_name, param_values, iterations=10):
             cf = CF(D)
             cf.fit(**{param_name: p})
             cf.online()
-            score = D.get_topK(alg=cf)
+
+            scanner = Greedy(cf.valid_options, cf.op_matrix, D)
+            score = scanner.get_topK()
             score[param_name] = p
             scores = pd.concat([scores, score], ignore_index=True)
 

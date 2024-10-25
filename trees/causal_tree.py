@@ -5,6 +5,10 @@ from trees.data import Data
 from trees.scanners import Greedy
 
 
+MAX_DEPTH = 8
+MIN_SAMPLES_LEAF = 50
+
+
 class CT:
     def __init__(self, D: Data, scan_method=Greedy):
         self.options = []
@@ -13,7 +17,9 @@ class CT:
         self.scan_method = scan_method
         self.algorithm = "CT on D" + f" ({scan_method.__name__})"
 
-    def fit(self, parse_depth=100, max_depth=8, min_samples_leaf=50):
+    def fit(
+        self, parse_depth=100, max_depth=MAX_DEPTH, min_samples_leaf=MIN_SAMPLES_LEAF
+    ):
         self.parse_depth = parse_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth, min_samples_leaf=min_samples_leaf
@@ -121,7 +127,9 @@ class CTP(CT):
         self.scan_method = scan_method
         self.algorithm = "CT on P" + f" ({scan_method.__name__})"
 
-    def fit(self, parse_depth=100, max_depth=8, min_samples_leaf=50):
+    def fit(
+        self, parse_depth=100, max_depth=MAX_DEPTH, min_samples_leaf=MIN_SAMPLES_LEAF
+    ):
         self.parse_depth = parse_depth
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
