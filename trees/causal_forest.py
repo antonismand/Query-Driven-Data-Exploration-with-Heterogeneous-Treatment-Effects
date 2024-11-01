@@ -6,7 +6,7 @@ from econml.cate_interpreter import SingleTreeCateInterpreter
 import matplotlib.pyplot as plt
 from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
 from sklearn.ensemble import RandomForestClassifier
-from trees.scanners import Greedy
+from trees.scanners import Scanner
 
 
 CRITERION = "mse"
@@ -19,15 +19,14 @@ MAX_FEATURES = "auto"
 
 
 class CF:
-    def __init__(self, D: Data, scan_method=Greedy):
+    def __init__(self, scan_method=Scanner):
         self.options = []
-        self.D = D
-        self.df = D.df
         self.scan_method = scan_method
         self.algorithm = "CF" + f" ({scan_method.__name__})"
 
     def fit(
         self,
+        D: Data,
         parse_depth=100,
         criterion=CRITERION,
         n_estimators=N_ESTIMATORS,
@@ -38,6 +37,8 @@ class CF:
         min_samples_leaf=MIN_SAMPLES_LEAF,
         max_features=MAX_FEATURES,
     ):
+        self.D = D
+        self.df = D.df
         self.parse_depth = parse_depth
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
@@ -154,15 +155,14 @@ class CF:
 
 
 class CFT(CF):
-    def __init__(self, D: Data, scan_method=Greedy):
+    def __init__(self, scan_method=Scanner):
         self.options = []
-        self.df = D.df
-        self.D = D
         self.scan_method = scan_method
         self.algorithm = "CF SingleTree" + f" ({scan_method.__name__})"
 
     def fit(
         self,
+        D: Data,
         parse_depth=100,
         criterion=CRITERION,
         n_estimators=N_ESTIMATORS,
@@ -174,6 +174,8 @@ class CFT(CF):
         max_features=MAX_FEATURES,
         print_tree=False,
     ):
+        self.df = D.df
+        self.D = D
         self.parse_depth = parse_depth
         forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
@@ -221,7 +223,7 @@ class CFT(CF):
         self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
 
 
-def parameter_tuning(param_name, param_values, iterations=10):
+def parameter_tuning(param_name, param_values, iterations=10, scan_method=Scanner):
     from trees.experiment import plots
 
     scores = pd.DataFrame()
@@ -233,19 +235,20 @@ def parameter_tuning(param_name, param_values, iterations=10):
             D.generate(seed=exp)
             D.generate_random_condition(print_condition=False)
 
-            cf = CF(D)
-            cf.fit(**{param_name: p})
+            cf = CF()
+            cf.fit(D=D, **{param_name: p})
             cf.online()
 
-            scanner = Greedy(cf.valid_options, cf.op_matrix, D)
+            scanner = scan_method(cf.valid_options, cf.op_matrix, D)
             score = scanner.get_topK()
             score[param_name] = p
             scores = pd.concat([scores, score], ignore_index=True)
 
-            cft = CFT(D)
-            cft.fit(**{param_name: p})
+            cft = CFT()
+            cft.fit(D=D, **{param_name: p})
             cft.online()
-            score = D.get_topK(alg=cft)
+            scanner = scan_method(cft.valid_options, cft.op_matrix, D)
+            score = scanner.get_topK()
             score[param_name] = p
             scores = pd.concat([scores, score], ignore_index=True)
 

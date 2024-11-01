@@ -8,10 +8,9 @@ import seaborn as sns
 from IPython.display import clear_output
 
 
-from trees.causal_forest import CF, CFT
-from trees.causal_tree import CT, CTP
+from trees.causal_tree import CT
 from trees.data import Data
-from trees.scanners import Exhaustive, Greedy, Scanner
+from trees.scanners import *
 
 
 class Experiment:
@@ -20,6 +19,7 @@ class Experiment:
         var_name: str,
         data_iterations=5,
         user_iterations=5,
+        algorithms=[],
         save_csv=True,
         **kwargs,
     ):
@@ -44,11 +44,9 @@ class Experiment:
                 print("Generating data", param_dict)
                 data.generate(**param_dict)
 
-                algorithms = self.get_algorithms(data)
-
                 for alg in algorithms:
                     start = time()
-                    alg.fit()
+                    alg.fit(D=data)
                     end = round(time() - start, 2)
                     print(f"[{alg.algorithm}] Offline time: {end}s")
 
@@ -112,20 +110,6 @@ class Experiment:
         plots(var_name, scores)
         if save_csv:
             scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
-
-    def get_algorithms(self, data):
-        return [
-            CT(data, scan_method=Greedy),
-            # CT(data, scan_method=Exhaustive),
-            CTP(data, scan_method=Greedy),
-            # CTP(data, scan_method=Exhaustive),
-            CF(data, scan_method=Greedy),
-            # CF(data, scan_method=Exhaustive),
-            CFT(data, scan_method=Greedy),
-            # CFT(data, scan_method=Exhaustive),
-            # BruteForce(cf, oracle=False),
-            # BruteForce(cf),
-        ]
 
     def get_signature(self, func, kwargs):
         signature = inspect.signature(func)
@@ -222,13 +206,13 @@ def plots(param_name, scores):
     plt.show()
 
 
-def debug(cate_model=CT, scanner=Greedy):
+def debug(cate_model=CT, scanner=Scanner):
     D = Data()
     D.generate()
 
-    alg = cate_model(D=D, scan_method=scanner)
+    alg = cate_model(scan_method=scanner)
     start = time()
-    alg.fit()
+    alg.fit(D=D)
     end = round(time() - start, 2)
     print(f"[{alg.algorithm}] Offline time: {end}")
 
@@ -244,6 +228,6 @@ def debug(cate_model=CT, scanner=Greedy):
     scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
     top = scan.get_topK()
     end = round(time() - start, 2)
-    print(f"[{scan.name}] get topK in {end}")
+    print(f"[{scan.name}] get topK score: {round(top['score'].mean(),2)} in {end}s")
 
     return top

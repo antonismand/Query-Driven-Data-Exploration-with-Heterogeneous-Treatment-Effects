@@ -2,7 +2,7 @@ from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
 from trees.data import Data
-from trees.scanners import Greedy
+from trees.scanners import Scanner
 
 
 MAX_DEPTH = 8
@@ -10,16 +10,25 @@ MIN_SAMPLES_LEAF = 50
 
 
 class CT:
-    def __init__(self, D: Data, scan_method=Greedy):
+    def __init__(self, scan_method=Scanner):
         self.options = []
-        self.D = D
-        self.df = D.df
         self.scan_method = scan_method
         self.algorithm = "CT on D" + f" ({scan_method.__name__})"
 
     def fit(
-        self, parse_depth=100, max_depth=MAX_DEPTH, min_samples_leaf=MIN_SAMPLES_LEAF
+        self,
+        D: Data,
+        parse_depth=100,
+        max_depth=MAX_DEPTH,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
+        on="D",
     ):
+        self.D = D
+        if on == "D":
+            self.df = D.df
+        else:
+            self.df = D.q_df
+
         self.parse_depth = parse_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
             groups_cnt=True, max_depth=max_depth, min_samples_leaf=min_samples_leaf
@@ -121,15 +130,19 @@ class CT:
 
 
 class CTP(CT):
-    def __init__(self, D: Data, scan_method=Greedy):
+    def __init__(self, scan_method=Scanner):
         self.options = []
-        self.D = D
         self.scan_method = scan_method
         self.algorithm = "CT on P" + f" ({scan_method.__name__})"
 
     def fit(
-        self, parse_depth=100, max_depth=MAX_DEPTH, min_samples_leaf=MIN_SAMPLES_LEAF
+        self,
+        D: Data,
+        parse_depth=100,
+        max_depth=MAX_DEPTH,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
     ):
+        self.D = D
         self.parse_depth = parse_depth
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
@@ -138,11 +151,12 @@ class CTP(CT):
         if self.D.p is None:
             raise ValueError("P is not set")
 
-        self.df = self.D.q_df
         self.options = []
         super().fit(
+            D=self.D,
             parse_depth=self.parse_depth,
             max_depth=self.max_depth,
             min_samples_leaf=self.min_samples_leaf,
+            on="P",
         )
         self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
