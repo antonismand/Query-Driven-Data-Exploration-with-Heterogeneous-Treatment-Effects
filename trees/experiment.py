@@ -91,7 +91,8 @@ class Experiment:
                                     **condition_dict,
                                     **topK_dict,
                                 }
-                                score[var_name] = current_combination[var_name]
+                                if var_name in current_combination:
+                                    score[var_name] = current_combination[var_name]
                                 scores = pd.concat([scores, score], ignore_index=True)
 
                 # clear_output(wait=True)

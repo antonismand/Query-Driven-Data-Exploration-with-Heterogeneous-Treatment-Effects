@@ -30,7 +30,7 @@ class Scanner:
 
         start = time()
         self.scan()
-        scan_time = round(time() - start, 2)
+        scan_time = round(time() - start, 3)
 
         for s in self.top_subs:
             s["t"] = self.D.CATE(s["condition"])
