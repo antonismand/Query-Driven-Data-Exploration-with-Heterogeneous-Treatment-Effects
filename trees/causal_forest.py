@@ -11,7 +11,7 @@ from trees.scanners import Scanner
 
 CRITERION = "mse"
 N_ESTIMATORS = 64
-MAX_DEPTH = 8
+MAX_DEPTH = 10
 CV = 2
 MIN_SAMPLES_SPLIT = 50
 MIN_SAMPLES_LEAF = 30
@@ -235,7 +235,7 @@ def parameter_tuning(param_name, param_values, iterations=10, scan_method=Scanne
             D.generate(seed=exp)
             D.generate_random_condition(print_condition=False)
 
-            cf = CF()
+            cf = CF(scan_method)
             cf.fit(D=D, **{param_name: p})
             cf.online()
 
@@ -244,7 +244,7 @@ def parameter_tuning(param_name, param_values, iterations=10, scan_method=Scanne
             score[param_name] = p
             scores = pd.concat([scores, score], ignore_index=True)
 
-            cft = CFT()
+            cft = CFT(scan_method)
             cft.fit(D=D, **{param_name: p})
             cft.online()
             scanner = scan_method(cft.valid_options, cft.op_matrix, D)

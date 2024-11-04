@@ -5,8 +5,8 @@ from trees.data import Data
 from trees.scanners import Scanner
 
 
-MAX_DEPTH = 8
-MIN_SAMPLES_LEAF = 50
+MAX_DEPTH = 10
+MIN_SAMPLES_LEAF = 30
 
 
 class CT:

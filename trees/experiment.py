@@ -94,7 +94,7 @@ class Experiment:
                                 score[var_name] = current_combination[var_name]
                                 scores = pd.concat([scores, score], ignore_index=True)
 
-                clear_output(wait=True)
+                # clear_output(wait=True)
 
         print(
             "Finished",
@@ -206,13 +206,13 @@ def plots(param_name, scores):
     plt.show()
 
 
-def debug(cate_model=CT, scanner=Scanner):
+def single_run(cate_model=CT, scanner=Scanner, seed=42):
     D = Data()
     D.generate()
 
     alg = cate_model(scan_method=scanner)
     start = time()
-    alg.fit(D=D)
+    alg.fit(D=D, seed=seed)
     end = round(time() - start, 2)
     print(f"[{alg.algorithm}] Offline time: {end}")
 

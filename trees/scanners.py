@@ -103,6 +103,49 @@ class Scanner:
         # print("Total score:", total_score / self.k)
 
 
+class GreedyCATE(Scanner):
+    def __init__(self, valid_subs: list, op_matrix: list, D, max_overlap=0.5):
+        super().__init__(valid_subs, op_matrix, D)
+        self.max_overlap = max_overlap
+
+    def scan(self):
+        if self.n_subs <= self.k:
+            return self.valid_subs
+
+        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
+        self.max_t = subs[0]["t_est"]
+
+        self.top_subs = deepcopy([subs[0]])
+
+        for i, sub in enumerate(subs[1:]):
+            # print("Checking sub", i)
+            accepted = True
+            for j, selected in enumerate(self.top_subs):
+                if self.op_matrix[selected["id"]][sub["id"]] > self.max_overlap:
+                    # print(
+                    #     "overlap of sub",
+                    #     i,
+                    #     "with selected",
+                    #     j,
+                    #     self.op_matrix[selected["id"]][sub["id"]],
+                    #     ">",
+                    #     self.max_overlap,
+                    # )
+                    accepted = False
+                    break
+
+            if accepted:
+                self.top_subs.append(sub)
+                if len(self.top_subs) == self.k:
+                    return self.top_subs
+
+        if len(self.top_subs) < self.k:
+            raise ValueError(
+                f"Not enough valid subgroups to satisfy max_overlap= {self.max_overlap}"
+            )
+        return self.top_subs
+
+
 class GreedyOverlap(Scanner):
     def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
         super().__init__(valid_subs, op_matrix, D)
@@ -125,9 +168,9 @@ class GreedyOverlap(Scanner):
             removed_sub = self.top_subs.pop(worst_overlap_idx)
             self.top_subs.append(sub)
 
-            new_worst_overlap, _ = self.get_worst_overlap(self.top_subs)
+            new_overlap, _ = self.get_worst_overlap(self.top_subs)
 
-            if new_worst_overlap > worst_overlap:
+            if new_overlap > worst_overlap:
                 # print("Reverting", new_worst_overlap, "with", worst_overlap)
                 self.top_subs.pop(-1)
                 self.top_subs.append(removed_sub)
@@ -135,36 +178,6 @@ class GreedyOverlap(Scanner):
             else:
                 worst_overlap, worst_overlap_idx = self.get_worst_overlap(self.top_subs)
                 # print("New worst overlap", worst_overlap)
-
-
-class GreedyScoreOld(Scanner):
-    def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
-        super().__init__(valid_subs, op_matrix, D)
-        self.percentile = percentile
-
-    def scan(self):
-        if self.n_subs <= self.k:
-            return self.valid_subs
-
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
-
-        percentile_index = int(self.percentile * self.n_subs)
-
-        self.top_subs = deepcopy(subs[: self.k])
-
-        _, min_score, min_score_idx = self.get_scores_for_subs(self.top_subs)
-
-        for sub in subs[self.k + 1 : percentile_index]:
-            sub_score = self.get_score_for_sub(top_subs=self.top_subs, s=sub)
-
-            if sub_score > min_score:
-                # print("Replacing", min_score, "with", sub_score)
-                self.top_subs.pop(min_score_idx)
-                self.top_subs.append(sub)
-
-                _, min_score, min_score_idx = self.get_scores_for_subs(self.top_subs)
-                # print("New min score", min_score)
 
 
 class GreedyScore(Scanner):
