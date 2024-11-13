@@ -1,11 +1,11 @@
 from trees.data import Data
 from trees.parser import Predicate
 
+D = Data()
+D.generate(seed=42)
+
 
 def test_P():
-    D = Data()
-    D.generate(seed=42)
-
     p1 = Predicate(p="feature_0>5 AND feature_1>10", D=D)
 
     assert p1.conditions == [
@@ -30,12 +30,49 @@ def test_P():
         ],
     ]
 
-    assert p2.includes({"feature_1": (1.5, 2)}) == True
-    assert p2.includes({"feature_6": (0, 1)}) == True
-    assert p2.includes({"feature_5": (3, 4)}) == False
     assert (
-        p2.includes({"feature_1": (1, 2), "feature_2": (0, 1), "feature_3": (0, 2)})
+        p2.includes(
+            {"feature_1": (1.5, 2), "feature_0": (3.1, 3.5)},
+        )
+        == True
+    )
+    assert p2.includes({"feature_6": (0, 1)}) == False
+    # assert p2.includes({"feature_5": (3, 4)}) == False
+    assert (
+        p2.includes(
+            {
+                "feature_1": (1, 2),
+                "feature_0": (3.1, 3.5),
+                "feature_2": (0, 1),
+                "feature_3": (0, 2),
+            }
+        )
         == True
     )
 
-    assert p2.includes({"feature_0": (3.0, 3.5)}) == True
+    assert p2.includes({"feature_0": (3.0, 3.5)}) == False
+
+    p3 = Predicate(p="feature_2 > 0", D=D)
+    assert p3.includes({"feature_1": (0, 1)}) == True
+
+
+def test_P_with_HTE():
+    p1 = Predicate(p="feature_0 > 0", D=D)
+    assert p1.includes({"feature_1": (0, 1)}) == False
+
+    assert p1.includes({"feature_0": (0, 1)}) == True
+    assert p1.includes({"feature_0": (0, 3), "feature_2": (0, 1)})
+
+    p2 = Predicate(p="feature_0 > 0 AND feature_2 > 0", D=D)
+    assert p2.includes({"feature_0": (0, 1)}) == True
+
+    p3 = Predicate(p="feature_0 > 0 AND feature_1 > 0 AND feature_2>0", D=D)
+    assert p3.includes({"feature_0": (0, 1)}) == False
+    assert p3.includes({"feature_0": (0, 1), "feature_1": (0, 1)}) == True
+
+
+def test_P_without_HTE():
+    p1 = Predicate(p="feature_3 > 0", D=D)
+
+    assert p1.includes({"feature_1": (0, 1)}) == True
+    assert p1.includes({"feature_3": (0, 1)}) == True

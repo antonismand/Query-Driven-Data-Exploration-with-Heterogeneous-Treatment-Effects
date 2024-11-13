@@ -61,6 +61,13 @@ class Scanner:
 
         return worst_overlap / (self.k - 1), worst_overlap_idx
 
+    def are_groups_valid(self, groups: list, threshold: float):
+        for s1 in groups:
+            for s2 in groups:
+                if self.op_matrix[s1["id"]][s2["id"]] > threshold:
+                    return False
+        return True
+
     # def compute_overlap_for_sub(self, top_subs: list, s: dict):
     #     overlap = (
     #         sum([self.op_matrix[top_sub["id"]][s["id"]] for top_sub in top_subs])
@@ -103,7 +110,7 @@ class Scanner:
         # print("Total score:", total_score / self.k)
 
 
-class GreedyCATE(Scanner):
+class ConstrainedJ(Scanner):
     def __init__(self, valid_subs: list, op_matrix: list, D, max_overlap=0.5):
         super().__init__(valid_subs, op_matrix, D)
         self.max_overlap = max_overlap
@@ -146,7 +153,7 @@ class GreedyCATE(Scanner):
         return self.top_subs
 
 
-class GreedyOverlap(Scanner):
+class ConstrainedT(Scanner):
     def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
         super().__init__(valid_subs, op_matrix, D)
         self.percentile = percentile
@@ -180,7 +187,7 @@ class GreedyOverlap(Scanner):
                 # print("New worst overlap", worst_overlap)
 
 
-class GreedyScore(Scanner):
+class Weighted(Scanner):
     def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
         super().__init__(valid_subs, op_matrix, D)
         self.percentile = percentile
@@ -213,7 +220,7 @@ class GreedyScore(Scanner):
                 # print("New min score", min_score)
 
 
-class Exhaustive(Scanner):
+class ExhaustiveWeighted(Scanner):
     def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
         super().__init__(valid_subs, op_matrix, D)
         self.percentile = percentile
@@ -236,3 +243,67 @@ class Exhaustive(Scanner):
                 # print("NEW score:", score, "previous:", best_score)
                 best_score = score
                 self.top_subs = candidates
+
+
+class ExhaustiveT(Scanner):
+    def __init__(
+        self, valid_subs: list, op_matrix: list, D, percentile=0.7, max_overlap=0.5
+    ):
+        super().__init__(valid_subs, op_matrix, D)
+        self.percentile = percentile
+        self.max_overlap = max_overlap
+
+    def scan(self):
+        best_cate = 0
+
+        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
+        self.max_t = subs[0]["t_est"]
+
+        percentile_index = int(self.percentile * self.n_subs)
+        pruned_subgroups = subs[:percentile_index]
+
+        for candidates in tqdm(
+            itertools.combinations(pruned_subgroups, self.k),
+            total=comb(len(pruned_subgroups), self.k),
+        ):
+
+            if self.are_groups_valid(candidates, self.max_overlap):
+                cate = sum([c["t_est"] for c in candidates])
+                if cate > best_cate:
+                    print("NEW CATE:", cate / self.k, "previous:", best_cate / self.k)
+                    best_cate = cate
+                    self.top_subs = candidates
+
+
+class ExhaustiveOverlap(Scanner):
+    def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
+        super().__init__(valid_subs, op_matrix, D)
+        self.percentile = percentile
+
+    def scan(self):
+        best_overlap = 999999
+
+        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
+        self.max_t = subs[0]["t_est"]
+
+        percentile_index = int(self.percentile * self.n_subs)
+        pruned_subgroups = subs[:percentile_index]
+
+        for candidates in tqdm(
+            itertools.combinations(pruned_subgroups, self.k),
+            total=comb(len(pruned_subgroups), self.k),
+        ):
+            for s1 in candidates:
+                overlap = sum([self.op_matrix[s1["id"]][s2["id"]] for s2 in candidates])
+
+            if overlap < best_overlap:
+                print("NEW overlap:", overlap, "previous:", best_overlap)
+                best_overlap = overlap
+                self.top_subs = candidates
+
+            if best_overlap == 0:
+                return
+
+
+greedy_scanners = [ConstrainedJ, ConstrainedT, Weighted]
+all_scanners = greedy_scanners + [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]

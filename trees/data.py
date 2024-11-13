@@ -40,14 +40,14 @@ class Data:
         self.max_t = df["ITE"].max()
         self.p = None
 
-        self.hte_features = ["feature_0", "feature_1"]
+        self.hte_features = ["feature_0", "feature_1"]  # This should be computed
         self.rest_features = [
             f for f in self.feature_names if f not in self.hte_features
         ]
 
-        if override_p_with_2:
-            self.feature_names = ["feature_0", "feature_1"]
-            df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
+        # if override_p_with_2:
+        #     self.feature_names = ["feature_0", "feature_1"]
+        #     df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
 
         self.df = pl.DataFrame(df)
 
@@ -123,7 +123,7 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def get_valid_subgroups(self, options: list, min_rows=5):
+    def get_valid_subgroups(self, options: list, min_rows=5, both_checks=True):
         """
         Get valid subgroups based on the provided Predicate.
 
@@ -140,20 +140,32 @@ class Data:
         max_t = 0
 
         accepted_subgroups = []
+        pruned_min_rows = 0
+        pruned_not_subsets = 0
         for opt in deepcopy(options):
-            if self.pp.includes(opt["combined"]):
-                r = f"{self.p} AND {opt['condition']}"
-                df = self.execute(r)
-                if df.shape[0] > min_rows:
+            r = f"{self.p} AND {opt['condition']}"
+            df = self.execute(r)
+            if df.shape[0] > min_rows:
+                if (
+                    both_checks and self.pp.includes(opt["combined"])
+                ) or not both_checks:
                     opt["rows"] = df.shape[0]
                     opt["total_options"] = n_options
                     accepted_subgroups.append(opt)
                     if opt["t_est"] > max_t:
                         max_t = opt["t_est"]
+                elif both_checks:
+                    pruned_not_subsets += 1
+                    # print(opt["combined"], "not subset")
+            else:
+                pruned_min_rows += 1
 
         end = time()
         for accepted in accepted_subgroups:
             accepted["validate_time"] = round(end - start, 2)
+
+        print("Pruned due to min rows:", pruned_min_rows)
+        print("Pruned due to not being subsets:", pruned_not_subsets)
 
         return accepted_subgroups, max_t
 

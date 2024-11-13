@@ -36,6 +36,7 @@ class CF:
         min_samples_split=MIN_SAMPLES_SPLIT,
         min_samples_leaf=MIN_SAMPLES_LEAF,
         max_features=MAX_FEATURES,
+        train_in_all_features=False,
     ):
         self.D = D
         self.df = D.df
@@ -54,15 +55,20 @@ class CF:
             max_features=max_features,
         )
 
+        if train_in_all_features:
+            self.features = self.D.feature_names
+        else:
+            self.features = self.D.hte_features
+
         if tune:
             self.forest.tune(
-                X=self.df[self.D.feature_names].to_numpy(),
+                X=self.df[self.features].to_numpy(),
                 Y=self.df["outcome"].to_numpy(),
                 T=self.df["treatment"].to_numpy(),
             )
 
         self.forest.fit(
-            X=self.df[self.D.feature_names].to_numpy(),
+            X=self.df[self.features].to_numpy(),
             Y=self.df["outcome"].to_numpy(),
             T=self.df["treatment"].to_numpy(),
         )
@@ -148,9 +154,9 @@ class CF:
     def get_important_features(self, threshold=0.01):
         important_features = []
         for i, fi in enumerate(self.forest.feature_importances_):
-            # print(f"{self.D.feature_names[i]}: {fi}")
+            # print(f"{self.features[i]}: {fi}")
             if fi > threshold:
-                important_features.append(self.D.feature_names[i])
+                important_features.append(self.features[i])
         return important_features
 
 
@@ -191,15 +197,17 @@ class CFT(CF):
             max_features=max_features,
         )
 
+        self.features = D.hte_features
+
         if tune:
             forest.tune(
-                X=self.df[self.D.feature_names].to_numpy(),
+                X=self.df[self.features].to_numpy(),
                 Y=self.df["outcome"].to_numpy(),
                 T=self.df["treatment"].to_numpy(),
             )
 
         forest.fit(
-            X=self.df[self.D.feature_names].to_numpy(),
+            X=self.df[self.features].to_numpy(),
             Y=self.df["outcome"].to_numpy(),
             T=self.df["treatment"].to_numpy(),
         )
@@ -209,11 +217,11 @@ class CFT(CF):
             max_depth=max_depth,
             min_samples_leaf=min_samples_leaf,
         )
-        intrp.interpret(forest, self.df[self.D.feature_names].to_numpy())
+        intrp.interpret(forest, self.df[self.features].to_numpy())
 
         if print_tree:
             plt.figure(figsize=(25, 5))
-            intrp.plot(feature_names=self.D.feature_names, fontsize=12)
+            intrp.plot(feature_names=self.features, fontsize=12)
 
         final_tree = intrp.tree_model_.tree_
         self.parse_tree(final_tree)

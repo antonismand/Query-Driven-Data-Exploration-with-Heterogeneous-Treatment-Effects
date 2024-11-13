@@ -64,24 +64,29 @@ class Predicate:
     def includes(self, combined: dict[str, tuple]):
         for cond in self.conditions:
             if len(cond) == 1:
-                for key, interval in cond[0].items():
-                    if key in combined and not self.D.is_subset(
-                        interval, combined[key]
-                    ):
-                        # print(f"{self.combined[key]} not in P: {interval}")
-                        return False
+                for attr, interval in cond[0].items():
+                    if attr in self.D.hte_features:
+                        if attr in combined and not self.D.is_subset(
+                            interval, combined[attr]
+                        ):
+                            # print(f"{self.combined[attr]} not in P: {interval}")
+                            return False
+                        elif attr not in combined:
+                            return False
             else:
                 any_satisfied = False
-                any_key_exists = False
+                any_attr_with_HTE = False
                 for sub_cond in cond:
-                    for key, interval in sub_cond.items():
-                        if key in combined:
-                            any_key_exists = True
-                            if self.D.is_subset(interval, combined[key]):
+                    for attr, interval in sub_cond.items():
+                        if attr in self.D.hte_features:
+                            any_attr_with_HTE = True
+                            if attr in combined and self.D.is_subset(
+                                interval, combined[attr]
+                            ):
                                 any_satisfied = True
                                 break
 
-                if not any_satisfied and any_key_exists:
+                if not any_satisfied and any_attr_with_HTE:
                     return False
 
         return True

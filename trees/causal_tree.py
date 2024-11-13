@@ -1,12 +1,14 @@
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
+import pandas as pd
 from trees.data import Data
 from trees.scanners import Scanner
 
 
 MAX_DEPTH = 10
 MIN_SAMPLES_LEAF = 30
+CRITERION = "causal_mse"
 
 
 class CT:
@@ -19,6 +21,7 @@ class CT:
         self,
         D: Data,
         parse_depth=100,
+        criterion=CRITERION,
         max_depth=MAX_DEPTH,
         min_samples_leaf=MIN_SAMPLES_LEAF,
         on="D",
@@ -31,10 +34,13 @@ class CT:
 
         self.parse_depth = parse_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
-            groups_cnt=True, max_depth=max_depth, min_samples_leaf=min_samples_leaf
+            criterion=criterion,
+            groups_cnt=True,
+            max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,
         )
         self.ctree.fit(
-            X=self.df[self.D.feature_names].to_numpy(),
+            X=self.df[self.D.hte_features].to_numpy(),
             y=self.df["outcome"].to_numpy(),
             treatment=self.df["treatment"].to_numpy(),
         )
@@ -49,6 +55,14 @@ class CT:
         plt.figure(figsize=(20, 20))
         plot_causal_tree(
             self.ctree, max_depth=max_depth, feature_names=self.D.feature_names
+        )
+
+    def feature_importances(self):
+        return pd.DataFrame(
+            {
+                "importance": self.ctree.feature_importances_,
+                "feature": self.D.hte_features,
+            }
         )
 
     def parse_tree(
@@ -159,4 +173,6 @@ class CTP(CT):
             min_samples_leaf=self.min_samples_leaf,
             on="P",
         )
-        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
+        self.valid_options, self.max_t = self.D.get_valid_subgroups(
+            self.options, both_checks=False
+        )
