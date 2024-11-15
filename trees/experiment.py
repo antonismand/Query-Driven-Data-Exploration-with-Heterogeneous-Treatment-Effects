@@ -129,12 +129,12 @@ def plots(param_name, scores):
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     sns.barplot(x=param_name, y="t", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"True CATE (higher is better)")
-    axs[0].set_ylabel(r"$\tau(x)$")
+    axs[0].set_ylabel(r"$\tau(S_i)$")
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="t_est", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Estimated CATE")
-    axs[1].set_ylabel(r"$\hat{{\tau}}(x)$")
+    axs[1].set_ylabel(r"$\hat{\tau}(S_i)$")
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -154,13 +154,27 @@ def plots(param_name, scores):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    sns.barplot(x=param_name, y="t_error", hue="algorithm", data=scores, ax=axs[0])
+    axs[0].set_title(f"Prediction error")
+    axs[0].set_ylabel(r"$|\tau(S_i) - \hat{\tau}(S_i)|$")
+    axs[0].legend(fontsize="x-small")
+
+    sns.barplot(x=param_name, y="t_r_error", hue="algorithm", data=scores, ax=axs[1])
+    axs[1].set_title(f"False Estimation")
+    axs[1].set_ylabel(r"$|\tau(R_i) - \tau(S_i)|$")
+    axs[1].legend([], [], frameon=False)
+    plt.show()
+
+    # ----------------- #
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     sns.barplot(x=param_name, y="overlap", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"Overlap")
     axs[0].set_ylabel("overlap")
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
-    axs[1].set_title(f"Score")
+    axs[1].set_title(f"Predicted Score")
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -186,9 +200,25 @@ def plots(param_name, scores):
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(
-        x=param_name, y="valid_options", hue="algorithm", data=scores, ax=axs[1]
+        x=param_name, y="invalid_options", hue="algorithm", data=scores, ax=axs[1]
     )
-    axs[1].set_title(f"Valid options")
+    axs[1].set_title(f"Invalid options")
+    axs[1].legend([], [], frameon=False)
+    plt.show()
+
+    # ----------------- #
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    sns.barplot(
+        x=param_name, y="pruned_min_rows", hue="algorithm", data=scores, ax=axs[0]
+    )
+    axs[0].set_title(f"Pruned due to min rows")
+    axs[0].legend(fontsize="x-small")
+
+    sns.barplot(
+        x=param_name, y="pruned_not_subsets", hue="algorithm", data=scores, ax=axs[1]
+    )
+    axs[1].set_title(f"Pruned due to not being subsets")
     axs[1].legend([], [], frameon=False)
     plt.show()
 

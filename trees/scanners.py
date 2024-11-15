@@ -34,9 +34,15 @@ class Scanner:
 
         for s in self.top_subs:
             s["t"] = self.D.CATE(s["condition"])
+            s["t_error"] = abs(s["t"] - s["t_est"])
+
+            r = f"{self.D.p} AND {s['condition']}"
+            s["t_r"] = self.D.CATE(r)
+            s["t_r_error"] = abs(s["t_r"] - s["t"])
+
             s["scan_method"] = self.name
             s["scan_time"] = scan_time
-            s["valid_options"] = self.n_subs
+            s["invalid_options"] = s["total_options"] - self.n_subs
             # s['true_score'] = w * s["t"] / self.max_t + (1 - w) * s["overlap_penalty"]
 
         self.compute_scores_for_top_subs()
@@ -240,7 +246,7 @@ class ExhaustiveWeighted(Scanner):
         ):
             score, _, _ = self.get_scores_for_subs(candidates)
             if score > best_score:
-                # print("NEW score:", score, "previous:", best_score)
+                print("NEW score:", score, "previous:", best_score)
                 best_score = score
                 self.top_subs = candidates
 

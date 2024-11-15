@@ -11,6 +11,9 @@ from trees.parser import Predicate
 from copy import deepcopy
 
 
+MIN_ROWS = 10
+
+
 class Data:
     def __init__(self):
         self.p = None
@@ -123,7 +126,7 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def get_valid_subgroups(self, options: list, min_rows=5, both_checks=True):
+    def get_valid_subgroups(self, options: list, min_rows=MIN_ROWS, both_checks=True):
         """
         Get valid subgroups based on the provided Predicate.
 
@@ -163,6 +166,8 @@ class Data:
         end = time()
         for accepted in accepted_subgroups:
             accepted["validate_time"] = round(end - start, 2)
+            accepted["pruned_min_rows"] = pruned_min_rows
+            accepted["pruned_not_subsets"] = pruned_not_subsets
 
         print("Pruned due to min rows:", pruned_min_rows)
         print("Pruned due to not being subsets:", pruned_not_subsets)

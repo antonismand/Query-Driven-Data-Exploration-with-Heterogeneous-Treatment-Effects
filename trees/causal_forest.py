@@ -154,7 +154,7 @@ class CF:
     def get_important_features(self, threshold=0.01):
         important_features = []
         for i, fi in enumerate(self.forest.feature_importances_):
-            # print(f"{self.features[i]}: {fi}")
+            print(f"{self.features[i]}: {fi}")
             if fi > threshold:
                 important_features.append(self.features[i])
         return important_features
