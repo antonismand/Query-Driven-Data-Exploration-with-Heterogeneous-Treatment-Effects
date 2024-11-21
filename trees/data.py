@@ -3,6 +3,7 @@ from causalml.dataset import synthetic_data
 import polars as pl
 import numpy as np
 import pandas as pd
+from trees import params
 
 
 from tqdm import tqdm
@@ -11,20 +12,17 @@ from trees.parser import Predicate
 from copy import deepcopy
 
 
-MIN_ROWS = 10
-
-
 class Data:
     def __init__(self):
         self.p = None
 
     def generate(
         self,
-        n=10000,
-        p=10,
-        sigma=3.0,
-        seed=42,
-        mode=2,
+        n=params.DATA.N_ROWS,
+        p=params.DATA.N_FEATURES,
+        sigma=params.DATA.SIGMA,
+        seed=params.DATA.SEED,
+        mode=params.DATA.MODE,
         override_p_with_2=False,
     ):
         np.random.seed(seed)
@@ -83,8 +81,11 @@ class Data:
         self.q_df = self.execute(p, on="D")
         self.pp = Predicate(p, self)
 
+    def n_rows(self, condition: str):
+        return self.execute(condition).shape[0]
+
     def calculate_selectivity(self, condition: str):
-        return self.execute(condition).shape[0] / self.df.shape[0]
+        return self.n_rows(condition) / self.df.shape[0]
 
     def generate_random_condition(
         self, min_s=0.3, max_s=0.95, features_in_P="all", print_condition=True
@@ -96,15 +97,13 @@ class Data:
                 features = self.hte_features
             else:
                 features = self.rest_features
+
             p = np.random.choice(features)
-            threshold = round(np.random.uniform(self.df[p].min(), self.df[p].max()), 3)
+            full_cond = self.random_condition_on_feature(p)
 
-            if np.random.choice([True, False]):
-                cond = "<="
-            else:
-                cond = ">"
-
-            full_cond = f"{p} {cond} {threshold}"
+            if np.random.choice([True, False]):  # randomly add another condition
+                p2 = np.random.choice(features)
+                full_cond += " AND " + self.random_condition_on_feature(p2)
 
             s = self.calculate_selectivity(full_cond)
 
@@ -113,6 +112,17 @@ class Data:
                 if print_condition:
                     print("User condition:", full_cond, "Selectivity:", s)
                 return full_cond, s
+
+    def random_condition_on_feature(self, feature):
+        threshold = round(
+            np.random.uniform(self.df[feature].min(), self.df[feature].max()), 3
+        )
+        if np.random.choice([True, False]):
+            cond = "<="
+        else:
+            cond = ">"
+
+        return f"{feature} {cond} {threshold}"
 
     def jaccard_distance(self, df1: pl.DataFrame, df2: pl.DataFrame):
         intersection = df1.join(df2, how="inner", on="id").shape[0]
@@ -126,65 +136,48 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def get_valid_subgroups(self, options: list, min_rows=MIN_ROWS, both_checks=True):
+    def get_valid_subgroups(self, subgroups: dict, min_rows=params.DATA.N_MIN_ROWS):
         """
         Get valid subgroups based on the provided Predicate.
 
         Args:
             P (str): The user's predicate in string format (WHERE only).
-            options (list): The list of subgroups to evaluate.
+            subgroups (dict): The subgroups to evaluate.
         """
         if self.p is None:
             raise ValueError("no P given")
 
-        start = time()
-        n_options = len(options)
+        # start = time()
+        # n_subgroups = len(subgroups)
 
-        max_t = 0
-
-        accepted_subgroups = []
+        valid_subgroups = []
         pruned_min_rows = 0
         pruned_not_subsets = 0
-        for opt in deepcopy(options):
-            r = f"{self.p} AND {opt['condition']}"
+        for id, sub in subgroups.items():
+            r = f"{self.p} AND {sub['condition']}"
             df = self.execute(r)
             if df.shape[0] > min_rows:
-                if (
-                    both_checks and self.pp.includes(opt["combined"])
-                ) or not both_checks:
-                    opt["rows"] = df.shape[0]
-                    opt["total_options"] = n_options
-                    accepted_subgroups.append(opt)
-                    if opt["t_est"] > max_t:
-                        max_t = opt["t_est"]
-                elif both_checks:
+                if self.pp.includes(sub["combined"]):
+                    valid_subgroups.append(id)
+
+                else:
                     pruned_not_subsets += 1
                     # print(opt["combined"], "not subset")
             else:
                 pruned_min_rows += 1
 
-        end = time()
-        for accepted in accepted_subgroups:
-            accepted["validate_time"] = round(end - start, 2)
-            accepted["pruned_min_rows"] = pruned_min_rows
-            accepted["pruned_not_subsets"] = pruned_not_subsets
-
+        # end = time()
+        # for accepted in accepted_subgroups:
+        #     accepted["validate_time"] = round(end - start, 2)
+        #     accepted["pruned_min_rows"] = pruned_min_rows
+        #     accepted["pruned_not_subsets"] = pruned_not_subsets
+        print(
+            "Total subgroups:", len(subgroups), "Valid subgroups:", len(valid_subgroups)
+        )
         print("Pruned due to min rows:", pruned_min_rows)
         print("Pruned due to not being subsets:", pruned_not_subsets)
 
-        return accepted_subgroups, max_t
-
-    def compute_overlap_matrix(self, options):
-        n_options = len(options)
-        op_matrix = np.zeros((n_options, n_options))
-
-        for i in tqdm(range(n_options)):
-            for j in range(i + 1, n_options):
-                overlap = self.jaccard(options[i]["combined"], options[j]["combined"])
-                op_matrix[i][j] = overlap
-                op_matrix[j][i] = overlap
-
-        return op_matrix
+        return valid_subgroups
 
     def intersection_range(self, interval1: tuple, interval2: tuple):
         start = max(interval1[0], interval2[0])
@@ -201,26 +194,26 @@ class Data:
         end = min(interval1[1], interval2[1])
         return end - start if start < end else 0
 
-    def jaccard_between_intervals(self, interval1: tuple, interval2: tuple):
-        intersection = self.intersection(interval1, interval2)
-        union = interval1[1] - interval1[0] + interval2[1] - interval2[0] - intersection
-        return intersection / union
+    # def jaccard_between_intervals(self, interval1: tuple, interval2: tuple):
+    #     intersection = self.intersection(interval1, interval2)
+    #     union = interval1[1] - interval1[0] + interval2[1] - interval2[0] - intersection
+    #     return intersection / union
 
-    def jaccard(self, c1: dict[str, tuple], c2: dict[str, tuple]):
-        common_keys = c1.keys() & c2.keys()
-        n_common = len(common_keys)
+    # def jaccard(self, c1: dict[str, tuple], c2: dict[str, tuple]):
+    #     common_keys = c1.keys() & c2.keys()
+    #     n_common = len(common_keys)
 
-        if n_common == 0:
-            return 0
+    #     if n_common == 0:
+    #         return 0
 
-        total = 0
-        for common in common_keys:
-            overlap = 0
-            if c1[common] == c2[common]:
-                overlap = 1
-            else:
-                overlap = self.jaccard_between_intervals(c1[common], c2[common])
+    #     total = 0
+    #     for common in common_keys:
+    #         overlap = 0
+    #         if c1[common] == c2[common]:
+    #             overlap = 1
+    #         else:
+    #             overlap = self.jaccard_between_intervals(c1[common], c2[common])
 
-            total += overlap
+    #         total += overlap
 
-        return total / n_common
+    #     return total / n_common

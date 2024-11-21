@@ -20,6 +20,7 @@ class Experiment:
         data_iterations=5,
         user_iterations=5,
         algorithms=[],
+        scanners=[],
         save_csv=True,
         **kwargs,
     ):
@@ -31,7 +32,7 @@ class Experiment:
         condition_params = self.get_signature(Data().generate_random_condition, kwargs)
         condition_keys = list(condition_params.keys())
 
-        topK_params = self.get_signature(Scanner([], [], None).get_topK, kwargs)
+        topK_params = self.get_signature(Scanner(None).get_topK, kwargs)
         topK_keys = list(topK_params.keys())
 
         for data_values in product(*data_params.values()):
@@ -68,32 +69,30 @@ class Experiment:
                             start = time()
                             alg.online()
                             end = round(time() - start, 2)
-                            print(
-                                f"[{alg.algorithm}] Online time: {end}s, Total Splits: {len(alg.options)}, Valid: {len(alg.valid_options)}"
-                            )
+                            print(f"[{alg.algorithm}] Online time: {end}s")
 
                             for topK_values in product(*topK_params.values()):
                                 topK_dict = dict(zip(topK_keys, topK_values))
-                                start = time()
-                                scan = alg.scan_method(
-                                    valid_subs=alg.valid_options,
-                                    op_matrix=alg.op_matrix,
-                                    D=data,
-                                )
-                                score = scan.get_topK(**topK_dict)
-                                end = round(time() - start, 2)
-                                print(
-                                    f"[{alg.algorithm}] get topK in {end}s - {str(topK_dict)}"
-                                )
 
-                                current_combination = {
-                                    **param_dict,
-                                    **condition_dict,
-                                    **topK_dict,
-                                }
-                                if var_name in current_combination:
-                                    score[var_name] = current_combination[var_name]
-                                scores = pd.concat([scores, score], ignore_index=True)
+                                for scanner in scanners:
+                                    start = time()
+                                    scan = scanner(alg=alg)
+                                    score = scan.get_topK(**topK_dict)
+                                    end = round(time() - start, 2)
+                                    print(
+                                        f"[{scan.name}] get topK in {end}s, score:{round(score['score'].mean(),2)} - {str(topK_dict)}"
+                                    )
+
+                                    current_combination = {
+                                        **param_dict,
+                                        **condition_dict,
+                                        **topK_dict,
+                                    }
+                                    if var_name in current_combination:
+                                        score[var_name] = current_combination[var_name]
+                                    scores = pd.concat(
+                                        [scores, score], ignore_index=True
+                                    )
 
                 # clear_output(wait=True)
 
@@ -208,28 +207,28 @@ def plots(param_name, scores):
 
     # ----------------- #
 
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(
-        x=param_name, y="pruned_min_rows", hue="algorithm", data=scores, ax=axs[0]
-    )
-    axs[0].set_title(f"Pruned due to min rows")
-    axs[0].legend(fontsize="x-small")
+    # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    # sns.barplot(
+    #     x=param_name, y="pruned_min_rows", hue="algorithm", data=scores, ax=axs[0]
+    # )
+    # axs[0].set_title(f"Pruned due to min rows")
+    # axs[0].legend(fontsize="x-small")
 
-    sns.barplot(
-        x=param_name, y="pruned_not_subsets", hue="algorithm", data=scores, ax=axs[1]
-    )
-    axs[1].set_title(f"Pruned due to not being subsets")
-    axs[1].legend([], [], frameon=False)
-    plt.show()
+    # sns.barplot(
+    #     x=param_name, y="pruned_not_subsets", hue="algorithm", data=scores, ax=axs[1]
+    # )
+    # axs[1].set_title(f"Pruned due to not being subsets")
+    # axs[1].legend([], [], frameon=False)
+    # plt.show()
 
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(
-        x=param_name, y="validate_time", hue="algorithm", data=scores, ax=axs[0]
-    )
-    axs[0].set_title(f"Validation Time")
-    axs[0].legend(fontsize="x-small")
+    # sns.barplot(
+    #     x=param_name, y="validate_time", hue="algorithm", data=scores, ax=axs[0]
+    # )
+    # axs[0].set_title(f"Validation Time")
+    # axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="scan_time", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Scan time")
@@ -252,9 +251,7 @@ def single_run(cate_model=CT, scanner=Scanner, seed=42):
     start = time()
     alg.online()
     end = round(time() - start, 2)
-    print(
-        f"[{alg.algorithm}] Online time: {end}, Total Splits: {len(alg.options)}, Valid: {len(alg.valid_options)}"
-    )
+    print(f"[{alg.algorithm}] Online time: {end}")
     start = time()
     scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
     top = scan.get_topK()

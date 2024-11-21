@@ -3,63 +3,81 @@ import itertools
 from math import comb
 from time import time
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from trees import params
+from trees.causal_tree import CT, CTP
 
 
 class Scanner:
-    def __init__(self, valid_subs: list, op_matrix: list, D):
+    def __init__(self, alg: CT | CTP):
 
-        self.valid_subs = deepcopy(valid_subs)
-        self.n_subs = len(valid_subs)
-        self.op_matrix = op_matrix
-        self.top_subs = []
-        self.max_t = 0
-        self.D = D
-        self.name = type(self).__name__
+        if alg is not None:
+            self.n_subgroups = len(alg.subgroups)
+            self.valid_subs = alg.valid_subgroups[:]
+            self.n_valid = len(self.valid_subs)
+            self.alg = alg
+
+            self.max_t = 0
+            self.D = alg.D
+            self.name = type(self).__name__
 
     def scan(self):
         pass
 
-    def get_topK(self, w=0.5, k=5):
+    def get_topK(self, w=params.SCANNER.W, k=params.SCANNER.K):
         if self.D.p is None:
             raise ValueError("no P given")
+
+        if self.n_valid <= k:
+            raise ValueError(f"Valid subgroups less than K= {k}")
 
         self.w = w
         self.k = k
 
         start = time()
-        self.scan()
+        recs = self.scan()  # ids
         scan_time = round(time() - start, 3)
 
-        for s in self.top_subs:
-            s["t"] = self.D.CATE(s["condition"])
-            s["t_error"] = abs(s["t"] - s["t_est"])
+        final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
+        for s in final_recs:
             r = f"{self.D.p} AND {s['condition']}"
-            s["t_r"] = self.D.CATE(r)
-            s["t_r_error"] = abs(s["t_r"] - s["t"])
+            s.update(
+                {
+                    "t": self.D.CATE(s["condition"]),
+                    "t_r": self.D.CATE(r),
+                    "scan_method": self.name,
+                    "scan_time": scan_time,
+                    "total_options": self.n_subgroups,
+                    "rows": self.D.n_rows(r),
+                    "overlap": self.compute_overlap_for_sub(
+                        recs, s["id"], sub_in_subs=True
+                    ),
+                    "score": self.get_score(recs, s["id"]),
+                }
+            )
 
-            s["scan_method"] = self.name
-            s["scan_time"] = scan_time
-            s["invalid_options"] = s["total_options"] - self.n_subs
-            # s['true_score'] = w * s["t"] / self.max_t + (1 - w) * s["overlap_penalty"]
+            s.update(
+                {
+                    "t_error": abs(s["t"] - s["t_est"]),
+                    "t_r_error": abs(s["t_r"] - s["t"]),
+                    "invalid_options": s["total_options"] - self.n_valid,
+                }
+            )
 
-        self.compute_scores_for_top_subs()
-        return pd.DataFrame(self.top_subs)
+        return pd.DataFrame(final_recs)
 
-    def get_score_for_sub(self, top_subs: list, s: dict):
-        overlap = (
-            sum([self.op_matrix[top_sub["id"]][s["id"]] for top_sub in top_subs])
-            / self.k
-        )
-        return self.w * s["t_est"] / self.max_t + (1 - self.w) * (1 - overlap)
+    def get_score(self, top_subs: list[int], id: int):  # ID should be in top_subs
+        overlap = self.compute_overlap_for_sub(top_subs, id, sub_in_subs=True)
+        return self.w * self.get_t(id) / self.max_t + (1 - self.w) * (1 - overlap)
 
-    def get_worst_overlap(self, subs: list):
+    def get_worst_overlap(self, subs: list[int]):
         worst_overlap = 0
         worst_overlap_idx = -1
         for i, s1 in enumerate(subs):
-            overlap = sum([self.op_matrix[s1["id"]][s2["id"]] for s2 in subs])
+            overlap = sum([self.get_J(s1, s2) for s2 in subs])
 
             if overlap > worst_overlap:
                 worst_overlap = overlap
@@ -74,24 +92,22 @@ class Scanner:
                     return False
         return True
 
-    # def compute_overlap_for_sub(self, top_subs: list, s: dict):
-    #     overlap = (
-    #         sum([self.op_matrix[top_sub["id"]][s["id"]] for top_sub in top_subs])
-    #         / self.k
-    #     )
-    #     return overlap
+    def compute_overlap_for_sub(self, subs: list[int], id: int, sub_in_subs=True):
+        div = self.k - 1 if sub_in_subs else self.k
+        overlap = sum([self.get_J(id, s2) for s2 in subs]) / div
+        return overlap
 
-    def get_scores_for_subs(self, subs: list):
+    def get_scores_for_subs(self, subs: list[int]):
 
         total_score = 0
         min_score = 999999999
         min_score_idx = -1
 
         for i, s1 in enumerate(subs):
-            overlap = sum([self.op_matrix[s1["id"]][s2["id"]] for s2 in subs])
+            overlap = sum([self.get_J(s1, s2) for s2 in subs])
             overlap /= self.k - 1
 
-            score = self.w * s1["t_est"] / self.max_t + (1 - self.w) * (1 - overlap)
+            score = self.w * self.get_t(s1) / self.max_t + (1 - self.w) * (1 - overlap)
             total_score += score
             if score < min_score:
                 min_score = score
@@ -100,41 +116,53 @@ class Scanner:
         total_score /= self.k
         return total_score, min_score, min_score_idx
 
-    def compute_scores_for_top_subs(self):
-        total_score = 0
-        for s1 in self.top_subs:
-            overlap = 0
-            for s2 in self.top_subs:
-                overlap += self.op_matrix[s1["id"]][s2["id"]]
+    def compute_overlap_matrix(self):
+        self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
 
-            overlap /= self.k - 1
-            s1["overlap"] = overlap
-            s1["score"] = self.w * s1["t_est"] / self.max_t + (1 - self.w) * (
-                1 - overlap
-            )
-            total_score += s1["score"]
-        # print("Total score:", total_score / self.k)
+        for id, sub in tqdm(self.alg.subgroups.items()):
+            for id2 in sub["parents"]:
+                overlap = self.D.jaccard_over_preds(
+                    sub["condition"], self.alg.subgroups[id2]["condition"]
+                )
+
+                self.op_matrix[id][id2] = overlap
+                self.op_matrix[id2][id] = overlap
+
+    def get_sub(self, id: int):
+        return self.alg.subgroups[id]
+
+    def copy_sub(self, id: int):
+        return deepcopy(self.alg.subgroups[id])
+
+    def get_t(self, id: int):
+        return self.alg.subgroups[id]["t_est"]
+
+    def get_J(self, id1: int, id2: int):
+        return self.op_matrix[id1][id2]
 
 
 class ConstrainedJ(Scanner):
-    def __init__(self, valid_subs: list, op_matrix: list, D, max_overlap=0.5):
-        super().__init__(valid_subs, op_matrix, D)
+    def __init__(
+        self,
+        alg: CT,
+        max_overlap=params.SCANNER.MAX_PAIRWISE_OVERLAP,
+    ):
+        super().__init__(alg)
         self.max_overlap = max_overlap
 
     def scan(self):
-        if self.n_subs <= self.k:
-            return self.valid_subs
+        self.compute_overlap_matrix()
 
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
+        subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
+        self.max_t = self.get_t(subs[0])
 
-        self.top_subs = deepcopy([subs[0]])
+        recs = [subs[0]]
 
-        for i, sub in enumerate(subs[1:]):
-            # print("Checking sub", i)
+        for sub in subs[1:]:
+            # print("Checking sub", sub)
             accepted = True
-            for j, selected in enumerate(self.top_subs):
-                if self.op_matrix[selected["id"]][sub["id"]] > self.max_overlap:
+            for selected in recs:
+                if self.op_matrix[selected][sub] > self.max_overlap:
                     # print(
                     #     "overlap of sub",
                     #     i,
@@ -148,96 +176,96 @@ class ConstrainedJ(Scanner):
                     break
 
             if accepted:
-                self.top_subs.append(sub)
-                if len(self.top_subs) == self.k:
-                    return self.top_subs
+                recs.append(sub)
+                if len(recs) == self.k:
+                    return recs
 
-        if len(self.top_subs) < self.k:
+        if len(recs) < self.k:
             raise ValueError(
-                f"Not enough valid subgroups to satisfy max_overlap= {self.max_overlap}"
+                f"Not enough valid subgroups to satisfy max_overlap={self.max_overlap}"
             )
-        return self.top_subs
+        return recs
 
 
 class ConstrainedT(Scanner):
-    def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
-        super().__init__(valid_subs, op_matrix, D)
+    def __init__(self, alg: CT, percentile=params.SCANNER.PERCENTILE):
+        super().__init__(alg)
         self.percentile = percentile
 
     def scan(self):
-        if self.n_subs <= self.k:
-            return self.valid_subs
+        self.compute_overlap_matrix()
 
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
+        subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
+        self.max_t = self.get_t(subs[0])
 
-        percentile_index = int(self.percentile * self.n_subs)
+        percentile_index = int(self.percentile * self.n_valid)
 
-        self.top_subs = deepcopy(subs[: self.k])
+        recs = subs[: self.k]
 
-        worst_overlap, worst_overlap_idx = self.get_worst_overlap(self.top_subs)
+        worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
 
         for sub in subs[self.k + 1 : percentile_index]:
-            removed_sub = self.top_subs.pop(worst_overlap_idx)
-            self.top_subs.append(sub)
+            removed_sub = recs.pop(worst_overlap_idx)
+            recs.append(sub)
 
-            new_overlap, _ = self.get_worst_overlap(self.top_subs)
+            new_overlap, _ = self.get_worst_overlap(recs)
 
             if new_overlap > worst_overlap:
                 # print("Reverting", new_worst_overlap, "with", worst_overlap)
-                self.top_subs.pop(-1)
-                self.top_subs.append(removed_sub)
+                recs.pop(-1)
+                recs.append(removed_sub)
 
             else:
-                worst_overlap, worst_overlap_idx = self.get_worst_overlap(self.top_subs)
+                worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
                 # print("New worst overlap", worst_overlap)
+
+        return recs
 
 
 class Weighted(Scanner):
-    def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
-        super().__init__(valid_subs, op_matrix, D)
-        self.percentile = percentile
+    def __init__(self, alg: CT):
+        super().__init__(alg)
 
     def scan(self):
-        if self.n_subs <= self.k:
-            return self.valid_subs
+        self.compute_overlap_matrix()
 
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
+        subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
+        self.max_t = self.get_t(subs[0])
 
-        percentile_index = int(self.percentile * self.n_subs)
+        recs = subs[: self.k]
 
-        self.top_subs = deepcopy(subs[: self.k])
+        _, min_score, min_score_idx = self.get_scores_for_subs(recs)
 
-        _, min_score, min_score_idx = self.get_scores_for_subs(self.top_subs)
+        for sub in subs[self.k + 1 :]:
+            removed_sub = recs.pop(min_score_idx)
+            recs.append(sub)
 
-        for sub in subs[self.k + 1 : percentile_index]:
-            removed_sub = self.top_subs.pop(min_score_idx)
-            self.top_subs.append(sub)
-
-            _, new_score, _ = self.get_scores_for_subs(self.top_subs)
+            _, new_score, _ = self.get_scores_for_subs(recs)
 
             if new_score < min_score:
                 # print("Reverting", new_score, "with", min_score)
-                self.top_subs.pop(-1)
-                self.top_subs.append(removed_sub)
+                recs.pop(-1)
+                recs.append(removed_sub)
             else:
-                _, min_score, min_score_idx = self.get_scores_for_subs(self.top_subs)
+                _, min_score, min_score_idx = self.get_scores_for_subs(recs)
                 # print("New min score", min_score)
+
+        return recs
 
 
 class ExhaustiveWeighted(Scanner):
-    def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
-        super().__init__(valid_subs, op_matrix, D)
+    def __init__(self, alg: CT, percentile=params.SCANNER.PERCENTILE):
+        super().__init__(alg)
         self.percentile = percentile
 
     def scan(self):
+        self.compute_overlap_matrix()
         best_score = 0
 
         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
         self.max_t = subs[0]["t_est"]
 
-        percentile_index = int(self.percentile * self.n_subs)
+        percentile_index = int(self.percentile * self.n_valid)
         pruned_subgroups = subs[:percentile_index]
 
         for candidates in tqdm(
@@ -253,19 +281,23 @@ class ExhaustiveWeighted(Scanner):
 
 class ExhaustiveT(Scanner):
     def __init__(
-        self, valid_subs: list, op_matrix: list, D, percentile=0.7, max_overlap=0.5
+        self,
+        alg: CT,
+        percentile=params.SCANNER.PERCENTILE,
+        max_overlap=params.SCANNER.MAX_PAIRWISE_OVERLAP,
     ):
-        super().__init__(valid_subs, op_matrix, D)
+        super().__init__(alg)
         self.percentile = percentile
         self.max_overlap = max_overlap
 
     def scan(self):
+        self.compute_overlap_matrix()
         best_cate = 0
 
         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
         self.max_t = subs[0]["t_est"]
 
-        percentile_index = int(self.percentile * self.n_subs)
+        percentile_index = int(self.percentile * self.n_valid)
         pruned_subgroups = subs[:percentile_index]
 
         for candidates in tqdm(
@@ -282,17 +314,18 @@ class ExhaustiveT(Scanner):
 
 
 class ExhaustiveOverlap(Scanner):
-    def __init__(self, valid_subs: list, op_matrix: list, D, percentile=0.7):
-        super().__init__(valid_subs, op_matrix, D)
+    def __init__(self, alg: CT, percentile=params.SCANNER.PERCENTILE):
+        super().__init__(alg)
         self.percentile = percentile
 
     def scan(self):
+        self.compute_overlap_matrix()
         best_overlap = 999999
 
         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
         self.max_t = subs[0]["t_est"]
 
-        percentile_index = int(self.percentile * self.n_subs)
+        percentile_index = int(self.percentile * self.n_valid)
         pruned_subgroups = subs[:percentile_index]
 
         for candidates in tqdm(

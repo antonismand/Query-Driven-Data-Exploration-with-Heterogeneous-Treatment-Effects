@@ -1,29 +1,24 @@
+from copy import deepcopy
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
 import pandas as pd
 from trees.data import Data
-from trees.scanners import Scanner
-
-
-MAX_DEPTH = 10
-MIN_SAMPLES_LEAF = 30
-CRITERION = "causal_mse"
+from trees import params
 
 
 class CT:
-    def __init__(self, scan_method=Scanner):
-        self.options = []
-        self.scan_method = scan_method
-        self.algorithm = "CT on D" + f" ({scan_method.__name__})"
+    def __init__(self):
+        self.subgroups = {}
+        self.algorithm = "[Hybrid] CT on D"
 
     def fit(
         self,
         D: Data,
         parse_depth=100,
-        criterion=CRITERION,
-        max_depth=MAX_DEPTH,
-        min_samples_leaf=MIN_SAMPLES_LEAF,
+        criterion=params.CT.CRITERION,
+        max_depth=params.CT.MAX_DEPTH,
+        min_samples_leaf=params.CT.MIN_SAMPLES_LEAF,
         on="D",
     ):
         self.D = D
@@ -46,16 +41,16 @@ class CT:
         )
         self.tree = self.ctree.tree_
         self.parse_tree()
-        self.op_matrix = self.D.compute_overlap_matrix(self.options)
 
     def online(self):
-        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
+        self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
 
     def plot_tree(self, max_depth=6):
-        plt.figure(figsize=(20, 20))
+        plt.figure(figsize=(100, 20))
         plot_causal_tree(
             self.ctree, max_depth=max_depth, feature_names=self.D.feature_names
         )
+        plt.show()
 
     def feature_importances(self):
         return pd.DataFrame(
@@ -73,6 +68,7 @@ class CT:
         prev_conditions="",
         prev_combined: dict[str, tuple] = {},
         depth=0,
+        parents: list = [],
         print_tree=False,
     ):
 
@@ -103,21 +99,25 @@ class CT:
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
+            if parent_id != 0:
+                parents.append(parent_id)
+
             if print_tree:
                 print(f"{depth * '  '}{full_condition},  CATE: {cate}")
-            self.options.append(
-                {
-                    "id": len(self.options),
-                    "condition": full_condition,
-                    "combined": combined,
-                    "features": len(combined),
-                    "t_est": abs(cate),
-                    "T0": round(self.tree.value[node_id][0][0], 2),
-                    "T1": round(self.tree.value[node_id][1][0], 2),
-                    "depth": depth,
-                    "algorithm": self.algorithm,
-                }
-            )
+
+            self.subgroups[node_id] = {
+                "id": node_id,
+                "condition": full_condition,
+                "combined": combined,
+                "features": len(combined),
+                "t_est": abs(cate),
+                "T0": round(self.tree.value[node_id][0][0], 2),
+                "T1": round(self.tree.value[node_id][1][0], 2),
+                "depth": depth,
+                "algorithm": self.algorithm,
+                "parents": parents[:],
+            }
+
         else:
             if print_tree:
                 print(rf"Root $\hat{{\tau}}(x)$: {cate}")
@@ -131,6 +131,7 @@ class CT:
                 prev_combined=combined,
                 depth=depth + 1,
                 print_tree=print_tree,
+                parents=parents[:],
             )
             self.parse_tree(
                 node_id=self.tree.children_right[node_id],
@@ -140,21 +141,21 @@ class CT:
                 prev_combined=combined,
                 depth=depth + 1,
                 print_tree=print_tree,
+                parents=parents[:],
             )
 
 
 class CTP(CT):
-    def __init__(self, scan_method=Scanner):
-        self.options = []
-        self.scan_method = scan_method
-        self.algorithm = "CT on P" + f" ({scan_method.__name__})"
+    def __init__(self):
+        self.subgroups = {}
+        self.algorithm = "[Online] CT on P"
 
     def fit(
         self,
         D: Data,
         parse_depth=100,
-        max_depth=MAX_DEPTH,
-        min_samples_leaf=MIN_SAMPLES_LEAF,
+        max_depth=params.CT.MAX_DEPTH,
+        min_samples_leaf=params.CT.MIN_SAMPLES_LEAF,
     ):
         self.D = D
         self.parse_depth = parse_depth
@@ -165,7 +166,7 @@ class CTP(CT):
         if self.D.p is None:
             raise ValueError("P is not set")
 
-        self.options = []
+        self.subgroups = {}
         super().fit(
             D=self.D,
             parse_depth=self.parse_depth,
@@ -173,6 +174,6 @@ class CTP(CT):
             min_samples_leaf=self.min_samples_leaf,
             on="P",
         )
-        self.valid_options, self.max_t = self.D.get_valid_subgroups(
-            self.options, both_checks=False
-        )
+
+        self.valid_subgroups = [x for x in self.subgroups.keys()]
+        print("Subgroups:", len(self.subgroups))

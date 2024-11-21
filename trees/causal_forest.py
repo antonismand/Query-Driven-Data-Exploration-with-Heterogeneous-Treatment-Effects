@@ -7,15 +7,7 @@ import matplotlib.pyplot as plt
 from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
 from sklearn.ensemble import RandomForestClassifier
 from trees.scanners import Scanner
-
-
-CRITERION = "mse"
-N_ESTIMATORS = 64
-MAX_DEPTH = 10
-CV = 2
-MIN_SAMPLES_SPLIT = 50
-MIN_SAMPLES_LEAF = 30
-MAX_FEATURES = "auto"
+from trees import params
 
 
 class CF:
@@ -28,14 +20,14 @@ class CF:
         self,
         D: Data,
         parse_depth=100,
-        criterion=CRITERION,
-        n_estimators=N_ESTIMATORS,
+        criterion=params.CF.CRITERION,
+        n_estimators=params.CF.N_ESTIMATORS,
         tune=False,
-        max_depth=MAX_DEPTH,
-        cv=CV,
-        min_samples_split=MIN_SAMPLES_SPLIT,
-        min_samples_leaf=MIN_SAMPLES_LEAF,
-        max_features=MAX_FEATURES,
+        max_depth=params.CF.MAX_DEPTH,
+        cv=params.CF.CV,
+        min_samples_split=params.CF.MIN_SAMPLES_SPLIT,
+        min_samples_leaf=params.CF.MIN_SAMPLES_LEAF,
+        max_features=params.CF.MAX_FEATURES,
         train_in_all_features=False,
     ):
         self.D = D
@@ -170,14 +162,14 @@ class CFT(CF):
         self,
         D: Data,
         parse_depth=100,
-        criterion=CRITERION,
-        n_estimators=N_ESTIMATORS,
+        criterion=params.CF.CRITERION,
+        n_estimators=params.CF.N_ESTIMATORS,
         tune=False,
-        max_depth=MAX_DEPTH,
-        cv=CV,
-        min_samples_split=MIN_SAMPLES_SPLIT,
-        min_samples_leaf=MIN_SAMPLES_LEAF,
-        max_features=MAX_FEATURES,
+        max_depth=params.CF.MAX_DEPTH,
+        cv=params.CF.CV,
+        min_samples_split=params.CF.MIN_SAMPLES_SPLIT,
+        min_samples_leaf=params.CF.MIN_SAMPLES_LEAF,
+        max_features=params.CF.MAX_FEATURES,
         print_tree=False,
     ):
         self.df = D.df
