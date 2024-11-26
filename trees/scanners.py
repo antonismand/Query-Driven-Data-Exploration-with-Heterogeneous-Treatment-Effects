@@ -28,14 +28,13 @@ class Scanner:
     def scan(self):
         pass
 
-    def get_topK(self, w=params.SCANNER.W, k=params.SCANNER.K):
+    def get_topK(self, k=params.SCANNER.K):
         if self.D.p is None:
             raise ValueError("no P given")
 
         if self.n_valid <= k:
             raise ValueError(f"Valid subgroups less than K= {k}")
 
-        self.w = w
         self.k = k
 
         start = time()
@@ -124,7 +123,7 @@ class Scanner:
     def compute_overlap_matrix(self, subs: list[int]):
         self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
 
-        for id in tqdm(subs):
+        for id in subs:
             sub = self.get_sub(id)
             for id2 in sub["parents"]:
                 overlap = self.D.jaccard_over_preds(
@@ -237,8 +236,9 @@ class Random(Scanner):
 
 
 class Weighted(Scanner):
-    def __init__(self, alg: CT):
+    def __init__(self, alg: CT, w=params.SCANNER.W):
         super().__init__(alg)
+        self.w = w
 
     def scan(self):
         self.compute_overlap_matrix(self.alg.valid_subgroups)
@@ -358,5 +358,10 @@ class ExhaustiveOverlap(Scanner):
                 return
 
 
-greedy_scanners = [ConstrainedJ, ConstrainedT, Weighted, Random]
-all_scanners = greedy_scanners + [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
+greedy_scanners = [ConstrainedJ, ConstrainedT, Weighted]
+all_scanners = greedy_scanners + [
+    Random,
+    ExhaustiveWeighted,
+    ExhaustiveT,
+    ExhaustiveOverlap,
+]

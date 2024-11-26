@@ -49,7 +49,7 @@ class Experiment:
                     start = time()
                     alg.fit(D=data)
                     end = round(time() - start, 2)
-                    print(f"[{alg.algorithm}] Offline time: {end}s")
+                    print(f"{alg.algorithm} - Offline time: {end}s")
 
                 for j in range(user_iterations):
                     for condition_values in product(*condition_params.values()):
@@ -66,10 +66,11 @@ class Experiment:
                         data.generate_random_condition(**condition_dict)
 
                         for alg in algorithms:
+                            print(f"{alg.algorithm} running")
                             start = time()
                             alg.online()
                             end = round(time() - start, 2)
-                            print(f"[{alg.algorithm}] Online time: {end}s")
+                            print(f"{alg.algorithm} - Online time: {end}s")
 
                             for topK_values in product(*topK_params.values()):
                                 topK_dict = dict(zip(topK_keys, topK_values))
@@ -80,7 +81,7 @@ class Experiment:
                                     score = scan.get_topK(**topK_dict)
                                     end = round(time() - start, 2)
                                     print(
-                                        f"[{scan.name}] get topK in {end}s - {str(topK_dict)}"
+                                        f"{scan.name} - get topK in {end}s - {str(topK_dict)}"
                                     )
 
                                     current_combination = {
@@ -172,9 +173,9 @@ def plots(param_name, scores):
     axs[0].set_ylabel("overlap")
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
-    axs[1].set_title(f"Predicted Score")
-    axs[1].legend([], [], frameon=False)
+    # sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
+    # axs[1].set_title(f"Predicted Score")
+    # axs[1].legend([], [], frameon=False)
     plt.show()
 
     # ----------------- #

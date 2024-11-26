@@ -11,10 +11,9 @@ from trees import params
 
 
 class CF:
-    def __init__(self, scan_method=Scanner):
-        self.options = []
-        self.scan_method = scan_method
-        self.algorithm = "CF" + f" ({scan_method.__name__})"
+    def __init__(self):
+        self.subgroups = {}
+        self.algorithm = "[Hybrid] CF"
 
     def fit(
         self,
@@ -68,10 +67,8 @@ class CF:
         for tree in self.forest.model_cate.estimators_[0]:
             self.parse_tree(tree.tree_)
 
-        self.op_matrix = self.D.compute_overlap_matrix(self.options)
-
     def online(self):
-        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
+        self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
 
     def parse_tree(
         self,
@@ -82,6 +79,7 @@ class CF:
         prev_conditions="",
         prev_combined: dict[str, tuple] = {},
         depth=0,
+        parents: list = [],
     ):
 
         cate = round(tree.value[node_id][0][0], 3)
@@ -111,17 +109,19 @@ class CF:
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
-            self.options.append(
-                {
-                    "id": len(self.options),
-                    "condition": full_condition,
-                    "combined": combined,
-                    "features": len(combined),
-                    "t_est": abs(cate),
-                    "depth": depth,
-                    "algorithm": self.algorithm,
-                }
-            )
+            if parent_id != 0:
+                parents.append(parent_id)
+
+            self.subgroups[node_id] = {
+                "id": node_id,
+                "condition": full_condition,
+                "combined": combined,
+                "features": len(combined),
+                "t_est": abs(cate),
+                "depth": depth,
+                "algorithm": self.algorithm,
+                "parents": parents[:],
+            }
 
         if tree.children_left[node_id] != -1 and depth < self.parse_depth:
             self.parse_tree(
@@ -132,6 +132,7 @@ class CF:
                 prev_conditions=full_condition,
                 prev_combined=combined,
                 depth=depth + 1,
+                parents=parents[:],
             )
             self.parse_tree(
                 tree=tree,
@@ -141,6 +142,7 @@ class CF:
                 prev_conditions=full_condition,
                 prev_combined=combined,
                 depth=depth + 1,
+                parents=parents[:],
             )
 
     def get_important_features(self, threshold=0.01):
@@ -153,10 +155,9 @@ class CF:
 
 
 class CFT(CF):
-    def __init__(self, scan_method=Scanner):
-        self.options = []
-        self.scan_method = scan_method
-        self.algorithm = "CF SingleTree" + f" ({scan_method.__name__})"
+    def __init__(self):
+        self.subgroups = {}
+        self.algorithm = "[Hybrid] CF"
 
     def fit(
         self,
@@ -217,10 +218,9 @@ class CFT(CF):
 
         final_tree = intrp.tree_model_.tree_
         self.parse_tree(final_tree)
-        self.op_matrix = self.D.compute_overlap_matrix(self.options)
 
     def online(self):
-        self.valid_options, self.max_t = self.D.get_valid_subgroups(self.options)
+        self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
 
 
 def parameter_tuning(param_name, param_values, iterations=10, scan_method=Scanner):

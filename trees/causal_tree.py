@@ -10,7 +10,7 @@ from trees import params
 class CT:
     def __init__(self):
         self.subgroups = {}
-        self.algorithm = "[Hybrid] CT on D"
+        self.algorithm = "[Hybrid] CT"
 
     def fit(
         self,
@@ -148,7 +148,7 @@ class CT:
 class CTP(CT):
     def __init__(self):
         self.subgroups = {}
-        self.algorithm = "[Online] CT on P"
+        self.algorithm = "[Online] CT"
 
     def fit(
         self,

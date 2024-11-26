@@ -147,7 +147,7 @@ class Data:
         if self.p is None:
             raise ValueError("no P given")
 
-        # start = time()
+        start = time()
         # n_subgroups = len(subgroups)
 
         valid_subgroups = []
@@ -166,7 +166,7 @@ class Data:
             else:
                 pruned_min_rows += 1
 
-        # end = time()
+        end = time()
         # for accepted in accepted_subgroups:
         #     accepted["validate_time"] = round(end - start, 2)
         #     accepted["pruned_min_rows"] = pruned_min_rows
@@ -174,8 +174,9 @@ class Data:
         print(
             "Total subgroups:", len(subgroups), "Valid subgroups:", len(valid_subgroups)
         )
-        print("Pruned due to min rows:", pruned_min_rows)
-        print("Pruned due to not being subsets:", pruned_not_subsets)
+        print("Filtered due to min rows:", pruned_min_rows)
+        print("Filtered due to not being subsets:", pruned_not_subsets)
+        print("Filtering Time:", round(end - start, 2))
 
         return valid_subgroups
 
