@@ -23,6 +23,8 @@ class Scanner:
             self.D = alg.D
             self.name = type(self).__name__
 
+            self.op_matrix = None
+
     def scan(self):
         pass
 
@@ -42,6 +44,9 @@ class Scanner:
 
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
+        if self.op_matrix is None:
+            self.compute_overlap_matrix(recs)
+
         for s in final_recs:
             r = f"{self.D.p} AND {s['condition']}"
             s.update(
@@ -55,7 +60,7 @@ class Scanner:
                     "overlap": self.compute_overlap_for_sub(
                         recs, s["id"], sub_in_subs=True
                     ),
-                    "score": self.get_score(recs, s["id"]),
+                    # "score": self.get_score(recs, s["id"]),
                 }
             )
 
@@ -116,13 +121,14 @@ class Scanner:
         total_score /= self.k
         return total_score, min_score, min_score_idx
 
-    def compute_overlap_matrix(self):
+    def compute_overlap_matrix(self, subs: list[int]):
         self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
 
-        for id, sub in tqdm(self.alg.subgroups.items()):
+        for id in tqdm(subs):
+            sub = self.get_sub(id)
             for id2 in sub["parents"]:
                 overlap = self.D.jaccard_over_preds(
-                    sub["condition"], self.alg.subgroups[id2]["condition"]
+                    sub["condition"], self.get_sub(id2)["condition"]
                 )
 
                 self.op_matrix[id][id2] = overlap
@@ -151,7 +157,7 @@ class ConstrainedJ(Scanner):
         self.max_overlap = max_overlap
 
     def scan(self):
-        self.compute_overlap_matrix()
+        self.compute_overlap_matrix(self.alg.valid_subgroups)
 
         subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
         self.max_t = self.get_t(subs[0])
@@ -193,7 +199,7 @@ class ConstrainedT(Scanner):
         self.percentile = percentile
 
     def scan(self):
-        self.compute_overlap_matrix()
+        self.compute_overlap_matrix(self.alg.valid_subgroups)
 
         subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
         self.max_t = self.get_t(subs[0])
@@ -222,12 +228,20 @@ class ConstrainedT(Scanner):
         return recs
 
 
+class Random(Scanner):
+    def __init__(self, alg: CT):
+        super().__init__(alg)
+
+    def scan(self):
+        return np.random.choice(self.valid_subs, self.k, replace=False)
+
+
 class Weighted(Scanner):
     def __init__(self, alg: CT):
         super().__init__(alg)
 
     def scan(self):
-        self.compute_overlap_matrix()
+        self.compute_overlap_matrix(self.alg.valid_subgroups)
 
         subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
         self.max_t = self.get_t(subs[0])
@@ -259,7 +273,7 @@ class ExhaustiveWeighted(Scanner):
         self.percentile = percentile
 
     def scan(self):
-        self.compute_overlap_matrix()
+        self.compute_overlap_matrix(self.alg.valid_subgroups)
         best_score = 0
 
         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
@@ -291,7 +305,7 @@ class ExhaustiveT(Scanner):
         self.max_overlap = max_overlap
 
     def scan(self):
-        self.compute_overlap_matrix()
+        self.compute_overlap_matrix(self.alg.valid_subgroups)
         best_cate = 0
 
         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
@@ -319,7 +333,7 @@ class ExhaustiveOverlap(Scanner):
         self.percentile = percentile
 
     def scan(self):
-        self.compute_overlap_matrix()
+        self.compute_overlap_matrix(self.alg.valid_subgroups)
         best_overlap = 999999
 
         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
@@ -344,5 +358,5 @@ class ExhaustiveOverlap(Scanner):
                 return
 
 
-greedy_scanners = [ConstrainedJ, ConstrainedT, Weighted]
+greedy_scanners = [ConstrainedJ, ConstrainedT, Weighted, Random]
 all_scanners = greedy_scanners + [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]

@@ -80,7 +80,7 @@ class Experiment:
                                     score = scan.get_topK(**topK_dict)
                                     end = round(time() - start, 2)
                                     print(
-                                        f"[{scan.name}] get topK in {end}s, score:{round(score['score'].mean(),2)} - {str(topK_dict)}"
+                                        f"[{scan.name}] get topK in {end}s - {str(topK_dict)}"
                                     )
 
                                     current_combination = {
