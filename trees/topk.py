@@ -10,7 +10,7 @@ from trees import params
 from trees.causal_tree import CT, CTP
 
 
-class Scanner:
+class TopK:
     def __init__(self, alg: CT | CTP):
 
         if alg is not None:
@@ -28,7 +28,7 @@ class Scanner:
     def scan(self):
         pass
 
-    def get_topK(self, k=params.SCANNER.K):
+    def get_topK(self, k=params.TOPK.K):
         if self.D.p is None:
             raise ValueError("no P given")
 
@@ -52,8 +52,9 @@ class Scanner:
                 {
                     "t": self.D.CATE(s["condition"]),
                     "t_r": self.D.CATE(r),
-                    "scan_method": self.name,
-                    "scan_time": scan_time,
+                    "topK_algorithm": self.name,
+                    "topK_execution_time": scan_time,
+                    "online_execution_time": self.alg.online_time,
                     "total_options": self.n_subgroups,
                     "rows": self.D.n_rows(r),
                     "overlap": self.compute_overlap_for_sub(
@@ -146,11 +147,11 @@ class Scanner:
         return self.op_matrix[id1][id2]
 
 
-class ConstrainedJ(Scanner):
+class ConstrainedJ(TopK):
     def __init__(
         self,
         alg: CT,
-        max_overlap=params.SCANNER.MAX_PAIRWISE_OVERLAP,
+        max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
     ):
         super().__init__(alg)
         self.max_overlap = max_overlap
@@ -192,8 +193,8 @@ class ConstrainedJ(Scanner):
         return recs
 
 
-class ConstrainedT(Scanner):
-    def __init__(self, alg: CT, percentile=params.SCANNER.PERCENTILE):
+class ConstrainedT(TopK):
+    def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
         super().__init__(alg)
         self.percentile = percentile
 
@@ -227,7 +228,7 @@ class ConstrainedT(Scanner):
         return recs
 
 
-class Random(Scanner):
+class Random(TopK):
     def __init__(self, alg: CT):
         super().__init__(alg)
 
@@ -235,8 +236,8 @@ class Random(Scanner):
         return np.random.choice(self.valid_subs, self.k, replace=False)
 
 
-class Weighted(Scanner):
-    def __init__(self, alg: CT, w=params.SCANNER.W):
+class Weighted(TopK):
+    def __init__(self, alg: CT, w=params.TOPK.W):
         super().__init__(alg)
         self.w = w
 
@@ -267,8 +268,8 @@ class Weighted(Scanner):
         return recs
 
 
-class ExhaustiveWeighted(Scanner):
-    def __init__(self, alg: CT, percentile=params.SCANNER.PERCENTILE):
+class ExhaustiveWeighted(TopK):
+    def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
         super().__init__(alg)
         self.percentile = percentile
 
@@ -293,12 +294,12 @@ class ExhaustiveWeighted(Scanner):
                 self.top_subs = candidates
 
 
-class ExhaustiveT(Scanner):
+class ExhaustiveT(TopK):
     def __init__(
         self,
         alg: CT,
-        percentile=params.SCANNER.PERCENTILE,
-        max_overlap=params.SCANNER.MAX_PAIRWISE_OVERLAP,
+        percentile=params.TOPK.PERCENTILE,
+        max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
     ):
         super().__init__(alg)
         self.percentile = percentile
@@ -327,8 +328,8 @@ class ExhaustiveT(Scanner):
                     self.top_subs = candidates
 
 
-class ExhaustiveOverlap(Scanner):
-    def __init__(self, alg: CT, percentile=params.SCANNER.PERCENTILE):
+class ExhaustiveOverlap(TopK):
+    def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
         super().__init__(alg)
         self.percentile = percentile
 
@@ -358,10 +359,34 @@ class ExhaustiveOverlap(Scanner):
                 return
 
 
-greedy_scanners = [ConstrainedJ, ConstrainedT, Weighted]
-all_scanners = greedy_scanners + [
-    Random,
-    ExhaustiveWeighted,
-    ExhaustiveT,
-    ExhaustiveOverlap,
-]
+class LevelBased(TopK):
+    def __init__(self, alg: CT):
+        super().__init__(alg)
+
+    def scan(self):
+        levels = {}
+
+        for id in self.valid_subs:
+            sub = self.get_sub(id)
+            if sub["depth"] not in levels:
+                levels[sub["depth"]] = []
+            levels[sub["depth"]].append(sub)
+
+        best_cate = 0
+        best_ids = []
+        for level in levels:
+            levels[level] = sorted(
+                levels[level], key=lambda x: x["t_est"], reverse=True
+            )
+            cate = sum([c["t_est"] for c in levels[level][0 : self.k]])
+            print("Level", level, "CATE:", cate)
+            if cate > best_cate:
+                best_cate = cate
+                best_ids = [c["id"] for c in levels[level][0 : self.k]]
+
+        return best_ids
+
+
+greedy = [ConstrainedJ, ConstrainedT, Weighted]
+exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
+all = greedy + [Random, LevelBased]

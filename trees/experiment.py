@@ -10,7 +10,7 @@ from IPython.display import clear_output
 
 from trees.causal_tree import CT
 from trees.data import Data
-from trees.scanners import *
+from trees.topk import *
 
 
 class Experiment:
@@ -32,7 +32,7 @@ class Experiment:
         condition_params = self.get_signature(Data().generate_random_condition, kwargs)
         condition_keys = list(condition_params.keys())
 
-        topK_params = self.get_signature(Scanner(None).get_topK, kwargs)
+        topK_params = self.get_signature(TopK(None).get_topK, kwargs)
         topK_keys = list(topK_params.keys())
 
         for data_values in product(*data_params.values()):
@@ -130,11 +130,13 @@ def plots(param_name, scores):
     sns.barplot(x=param_name, y="t", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"True CATE (higher is better)")
     axs[0].set_ylabel(r"$\tau(S_i)$")
+    axs[0].tick_params(axis="x", labelrotation=30)
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="t_est", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Estimated CATE")
     axs[1].set_ylabel(r"$\hat{\tau}(S_i)$")
+    axs[1].tick_params(axis="x", labelrotation=30)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -157,11 +159,14 @@ def plots(param_name, scores):
     sns.barplot(x=param_name, y="t_error", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"Prediction error")
     axs[0].set_ylabel(r"$|\tau(S_i) - \hat{\tau}(S_i)|$")
+    axs[0].tick_params(axis="x", labelrotation=30)
+
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="t_r_error", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"False Estimation")
     axs[1].set_ylabel(r"$|\tau(R_i) - \tau(S_i)|$")
+    axs[1].tick_params(axis="x", labelrotation=30)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -171,6 +176,7 @@ def plots(param_name, scores):
     sns.barplot(x=param_name, y="overlap", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"Overlap")
     axs[0].set_ylabel("overlap")
+    axs[0].tick_params(axis="x", labelrotation=30)
     axs[0].legend(fontsize="x-small")
 
     # sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
@@ -183,10 +189,12 @@ def plots(param_name, scores):
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     sns.barplot(x=param_name, y="depth", hue="algorithm", data=scores, ax=axs[0])
     axs[0].set_title(f"Depth")
+    axs[0].tick_params(axis="x", labelrotation=30)
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=param_name, y="features", hue="algorithm", data=scores, ax=axs[1])
     axs[1].set_title(f"Features")
+    axs[1].tick_params(axis="x", labelrotation=30)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -197,12 +205,14 @@ def plots(param_name, scores):
         x=param_name, y="total_options", hue="algorithm", data=scores, ax=axs[0]
     )
     axs[0].set_title(f"Total options")
+    axs[0].tick_params(axis="x", labelrotation=30)
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(
         x=param_name, y="invalid_options", hue="algorithm", data=scores, ax=axs[1]
     )
     axs[1].set_title(f"Invalid options")
+    axs[1].tick_params(axis="x", labelrotation=30)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -225,38 +235,42 @@ def plots(param_name, scores):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    # sns.barplot(
-    #     x=param_name, y="validate_time", hue="algorithm", data=scores, ax=axs[0]
-    # )
-    # axs[0].set_title(f"Validation Time")
-    # axs[0].legend(fontsize="x-small")
+    sns.barplot(
+        x=param_name, y="online_execution_time", hue="algorithm", data=scores, ax=axs[0]
+    )
+    axs[0].set_title(f"Online Execution Time")
+    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="scan_time", hue="algorithm", data=scores, ax=axs[1])
-    axs[1].set_title(f"Scan time")
+    sns.barplot(
+        x=param_name, y="topK_execution_time", hue="algorithm", data=scores, ax=axs[1]
+    )
+    axs[1].set_title(f"TopK execution time")
+    axs[1].tick_params(axis="x", labelrotation=30)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
 
-def single_run(cate_model=CT, scanner=Scanner, seed=42):
-    D = Data()
-    D.generate()
+# def single_run(cate_model=CT, scanner=TopK, seed=42):
+#     D = Data()
+#     D.generate()
 
-    alg = cate_model(scan_method=scanner)
-    start = time()
-    alg.fit(D=D, seed=seed)
-    end = round(time() - start, 2)
-    print(f"[{alg.algorithm}] Offline time: {end}")
+#     alg = cate_model(scan_method=scanner)
+#     start = time()
+#     alg.fit(D=D, seed=seed)
+#     end = round(time() - start, 2)
+#     print(f"[{alg.algorithm}] Offline time: {end}")
 
-    D.generate_random_condition()
+#     D.generate_random_condition()
 
-    start = time()
-    alg.online()
-    end = round(time() - start, 2)
-    print(f"[{alg.algorithm}] Online time: {end}")
-    start = time()
-    scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
-    top = scan.get_topK()
-    end = round(time() - start, 2)
-    print(f"[{scan.name}] get topK score: {round(top['score'].mean(),2)} in {end}s")
+#     start = time()
+#     alg.online()
+#     end = round(time() - start, 2)
+#     print(f"[{alg.algorithm}] Online time: {end}")
+#     start = time()
+#     scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
+#     top = scan.get_topK()
+#     end = round(time() - start, 2)
+#     print(f"[{scan.name}] get topK score: {round(top['score'].mean(),2)} in {end}s")
 
-    return top
+#     return top

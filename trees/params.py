@@ -23,7 +23,7 @@ class CF:
     MAX_FEATURES = "auto"
 
 
-class SCANNER:
+class TOPK:
     W = 0.5
     K = 5
     MAX_PAIRWISE_OVERLAP = 0.5

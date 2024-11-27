@@ -1,4 +1,5 @@
 from copy import deepcopy
+from time import time
 from causalml.inference.tree import CausalTreeRegressor
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
@@ -43,7 +44,9 @@ class CT:
         self.parse_tree()
 
     def online(self):
+        start = time()
         self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
+        self.online_time = round(time() - start, 2)
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(100, 20))
@@ -163,6 +166,7 @@ class CTP(CT):
         self.min_samples_leaf = min_samples_leaf
 
     def online(self):
+        start = time()
         if self.D.p is None:
             raise ValueError("P is not set")
 
@@ -177,3 +181,4 @@ class CTP(CT):
 
         self.valid_subgroups = [x for x in self.subgroups.keys()]
         print("Subgroups:", len(self.subgroups))
+        self.online_time = round(time() - start, 2)

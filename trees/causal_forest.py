@@ -1,3 +1,4 @@
+from time import time
 from econml.dml import CausalForestDML
 import pandas as pd
 from tqdm import tqdm
@@ -6,7 +7,7 @@ from econml.cate_interpreter import SingleTreeCateInterpreter
 import matplotlib.pyplot as plt
 from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
 from sklearn.ensemble import RandomForestClassifier
-from trees.scanners import Scanner
+from trees.topk import TopK
 from trees import params
 
 
@@ -220,10 +221,12 @@ class CFT(CF):
         self.parse_tree(final_tree)
 
     def online(self):
+        start = time()
         self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
+        self.online_time = round(time() - start, 2)
 
 
-def parameter_tuning(param_name, param_values, iterations=10, scan_method=Scanner):
+def parameter_tuning(param_name, param_values, iterations=10, scan_method=TopK):
     from trees.experiment import plots
 
     scores = pd.DataFrame()
