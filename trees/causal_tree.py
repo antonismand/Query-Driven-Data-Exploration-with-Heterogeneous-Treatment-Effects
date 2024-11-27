@@ -21,12 +21,17 @@ class CT:
         max_depth=params.CT.MAX_DEPTH,
         min_samples_leaf=params.CT.MIN_SAMPLES_LEAF,
         on="D",
+        train_in_all_features=True,
     ):
         self.D = D
         if on == "D":
             self.df = D.df
         else:
             self.df = D.q_df
+
+        self.features = (
+            self.D.feature_names if train_in_all_features else self.D.hte_features
+        )
 
         self.parse_depth = parse_depth
         self.ctree: CausalTreeRegressor = CausalTreeRegressor(
@@ -36,7 +41,7 @@ class CT:
             min_samples_leaf=min_samples_leaf,
         )
         self.ctree.fit(
-            X=self.df[self.D.hte_features].to_numpy(),
+            X=self.df[self.features].to_numpy(),
             y=self.df["outcome"].to_numpy(),
             treatment=self.df["treatment"].to_numpy(),
         )
@@ -50,16 +55,14 @@ class CT:
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(100, 20))
-        plot_causal_tree(
-            self.ctree, max_depth=max_depth, feature_names=self.D.feature_names
-        )
+        plot_causal_tree(self.ctree, max_depth=max_depth, feature_names=self.features)
         plt.show()
 
     def feature_importances(self):
         return pd.DataFrame(
             {
                 "importance": self.ctree.feature_importances_,
-                "feature": self.D.hte_features,
+                "feature": self.features,
             }
         )
 

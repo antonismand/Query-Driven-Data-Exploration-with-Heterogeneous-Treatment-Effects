@@ -28,7 +28,7 @@ class CF:
         min_samples_split=params.CF.MIN_SAMPLES_SPLIT,
         min_samples_leaf=params.CF.MIN_SAMPLES_LEAF,
         max_features=params.CF.MAX_FEATURES,
-        train_in_all_features=False,
+        train_in_all_features=True,
     ):
         self.D = D
         self.df = D.df
@@ -47,10 +47,9 @@ class CF:
             max_features=max_features,
         )
 
-        if train_in_all_features:
-            self.features = self.D.feature_names
-        else:
-            self.features = self.D.hte_features
+        self.features = (
+            self.D.feature_names if train_in_all_features else self.D.hte_features
+        )
 
         if tune:
             self.forest.tune(
@@ -172,6 +171,7 @@ class CFT(CF):
         min_samples_split=params.CF.MIN_SAMPLES_SPLIT,
         min_samples_leaf=params.CF.MIN_SAMPLES_LEAF,
         max_features=params.CF.MAX_FEATURES,
+        train_in_all_features=True,
         print_tree=False,
     ):
         self.df = D.df
@@ -191,7 +191,9 @@ class CFT(CF):
             max_features=max_features,
         )
 
-        self.features = D.hte_features
+        self.features = (
+            self.D.feature_names if train_in_all_features else self.D.hte_features
+        )
 
         if tune:
             forest.tune(
