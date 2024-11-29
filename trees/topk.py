@@ -23,7 +23,7 @@ class TopK:
             self.D = alg.D
             self.name = type(self).__name__
 
-            self.op_matrix = None
+            self.op_matrix = np.ones((self.n_subgroups + 1, self.n_subgroups + 1)) * -1
 
     def scan(self):
         pass
@@ -42,9 +42,6 @@ class TopK:
         scan_time = round(time() - start, 3)
 
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
-
-        if self.op_matrix is None:
-            self.compute_overlap_matrix(recs)
 
         for s in final_recs:
             r = f"{self.D.p} AND {s['condition']}"
@@ -93,7 +90,7 @@ class TopK:
     def are_groups_valid(self, groups: list, threshold: float):
         for s1 in groups:
             for s2 in groups:
-                if self.op_matrix[s1["id"]][s2["id"]] > threshold:
+                if self.get_J(s1["id"], s2["id"]) > threshold:
                     return False
         return True
 
@@ -121,18 +118,31 @@ class TopK:
         total_score /= self.k
         return total_score, min_score, min_score_idx
 
-    def compute_overlap_matrix(self, subs: list[int]):
-        self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
+    # def estimate_overlap_matrix(self, subs: list[int]):
+    #     self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
 
-        for id in subs:
-            sub = self.get_sub(id)
-            for id2 in sub["parents"]:
-                overlap = self.D.jaccard_over_preds(
-                    sub["condition"], self.get_sub(id2)["condition"]
-                )
+    #     for id in subs:
+    #         sub = self.get_sub(id)
+    #         for id2 in sub["parents"]:
+    #             overlap = self.D.estimate_jaccard(
+    #                 sub["combined"], self.get_sub(id2)["combined"]
+    #             )
 
-                self.op_matrix[id][id2] = overlap
-                self.op_matrix[id2][id] = overlap
+    #             self.op_matrix[id][id2] = overlap
+    #             self.op_matrix[id2][id] = overlap
+
+    # def compute_overlap_matrix(self, subs: list[int]):
+    #     self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
+
+    #     for id in subs:
+    #         sub = self.get_sub(id)
+    #         for id2 in sub["parents"]:
+    #             overlap = self.D.jaccard_over_preds(
+    #                 sub["condition"], self.get_sub(id2)["condition"]
+    #             )
+
+    #             self.op_matrix[id][id2] = overlap
+    #             self.op_matrix[id2][id] = overlap
 
     def get_sub(self, id: int):
         return self.alg.subgroups[id]
@@ -143,8 +153,24 @@ class TopK:
     def get_t(self, id: int):
         return self.alg.subgroups[id]["t_est"]
 
+    # def get_J(self, id1: int, id2: int):
+    #     return self.op_matrix[id1][id2]
+
     def get_J(self, id1: int, id2: int):
-        return self.op_matrix[id1][id2]
+        if self.op_matrix[id1][id2] != -1:
+            return self.op_matrix[id1][id2]
+
+        sub1 = self.get_sub(id1)
+        sub2 = self.get_sub(id2)
+
+        if id1 in sub2["parents"] or id2 in sub1["parents"]:
+            overlap = self.D.jaccard_over_preds(sub1["condition"], sub2["condition"])
+            self.op_matrix[id1][id2] = overlap
+            self.op_matrix[id2][id1] = overlap
+            return overlap
+
+        self.op_matrix[id1][id2] = 0
+        return 0
 
 
 class ConstrainedJ(TopK):
@@ -157,7 +183,7 @@ class ConstrainedJ(TopK):
         self.max_overlap = max_overlap
 
     def scan(self):
-        self.compute_overlap_matrix(self.alg.valid_subgroups)
+        # self.compute_overlap_matrix(self.alg.valid_subgroups)
 
         subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
         self.max_t = self.get_t(subs[0])
@@ -168,7 +194,7 @@ class ConstrainedJ(TopK):
             # print("Checking sub", sub)
             accepted = True
             for selected in recs:
-                if self.op_matrix[selected][sub] > self.max_overlap:
+                if self.get_J(selected, sub) > self.max_overlap:
                     # print(
                     #     "overlap of sub",
                     #     i,
@@ -199,7 +225,7 @@ class ConstrainedT(TopK):
         self.percentile = percentile
 
     def scan(self):
-        self.compute_overlap_matrix(self.alg.valid_subgroups)
+        # self.compute_overlap_matrix(self.alg.valid_subgroups)
 
         subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
         self.max_t = self.get_t(subs[0])
@@ -242,7 +268,7 @@ class Weighted(TopK):
         self.w = w
 
     def scan(self):
-        self.compute_overlap_matrix(self.alg.valid_subgroups)
+        # self.compute_overlap_matrix(self.alg.valid_subgroups)
 
         subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
         self.max_t = self.get_t(subs[0])
@@ -268,95 +294,95 @@ class Weighted(TopK):
         return recs
 
 
-class ExhaustiveWeighted(TopK):
-    def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
-        super().__init__(alg)
-        self.percentile = percentile
+# class ExhaustiveWeighted(TopK):
+#     def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
+#         super().__init__(alg)
+#         self.percentile = percentile
 
-    def scan(self):
-        self.compute_overlap_matrix(self.alg.valid_subgroups)
-        best_score = 0
+#     def scan(self):
+#         self.compute_overlap_matrix(self.alg.valid_subgroups)
+#         best_score = 0
 
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
+#         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
+#         self.max_t = subs[0]["t_est"]
 
-        percentile_index = int(self.percentile * self.n_valid)
-        pruned_subgroups = subs[:percentile_index]
+#         percentile_index = int(self.percentile * self.n_valid)
+#         pruned_subgroups = subs[:percentile_index]
 
-        for candidates in tqdm(
-            itertools.combinations(pruned_subgroups, self.k),
-            total=comb(len(pruned_subgroups), self.k),
-        ):
-            score, _, _ = self.get_scores_for_subs(candidates)
-            if score > best_score:
-                print("NEW score:", score, "previous:", best_score)
-                best_score = score
-                self.top_subs = candidates
-
-
-class ExhaustiveT(TopK):
-    def __init__(
-        self,
-        alg: CT,
-        percentile=params.TOPK.PERCENTILE,
-        max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
-    ):
-        super().__init__(alg)
-        self.percentile = percentile
-        self.max_overlap = max_overlap
-
-    def scan(self):
-        self.compute_overlap_matrix(self.alg.valid_subgroups)
-        best_cate = 0
-
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
-
-        percentile_index = int(self.percentile * self.n_valid)
-        pruned_subgroups = subs[:percentile_index]
-
-        for candidates in tqdm(
-            itertools.combinations(pruned_subgroups, self.k),
-            total=comb(len(pruned_subgroups), self.k),
-        ):
-
-            if self.are_groups_valid(candidates, self.max_overlap):
-                cate = sum([c["t_est"] for c in candidates])
-                if cate > best_cate:
-                    print("NEW CATE:", cate / self.k, "previous:", best_cate / self.k)
-                    best_cate = cate
-                    self.top_subs = candidates
+#         for candidates in tqdm(
+#             itertools.combinations(pruned_subgroups, self.k),
+#             total=comb(len(pruned_subgroups), self.k),
+#         ):
+#             score, _, _ = self.get_scores_for_subs(candidates)
+#             if score > best_score:
+#                 print("NEW score:", score, "previous:", best_score)
+#                 best_score = score
+#                 self.top_subs = candidates
 
 
-class ExhaustiveOverlap(TopK):
-    def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
-        super().__init__(alg)
-        self.percentile = percentile
+# class ExhaustiveT(TopK):
+#     def __init__(
+#         self,
+#         alg: CT,
+#         percentile=params.TOPK.PERCENTILE,
+#         max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
+#     ):
+#         super().__init__(alg)
+#         self.percentile = percentile
+#         self.max_overlap = max_overlap
 
-    def scan(self):
-        self.compute_overlap_matrix(self.alg.valid_subgroups)
-        best_overlap = 999999
+#     def scan(self):
+#         self.compute_overlap_matrix(self.alg.valid_subgroups)
+#         best_cate = 0
 
-        subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
-        self.max_t = subs[0]["t_est"]
+#         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
+#         self.max_t = subs[0]["t_est"]
 
-        percentile_index = int(self.percentile * self.n_valid)
-        pruned_subgroups = subs[:percentile_index]
+#         percentile_index = int(self.percentile * self.n_valid)
+#         pruned_subgroups = subs[:percentile_index]
 
-        for candidates in tqdm(
-            itertools.combinations(pruned_subgroups, self.k),
-            total=comb(len(pruned_subgroups), self.k),
-        ):
-            for s1 in candidates:
-                overlap = sum([self.op_matrix[s1["id"]][s2["id"]] for s2 in candidates])
+#         for candidates in tqdm(
+#             itertools.combinations(pruned_subgroups, self.k),
+#             total=comb(len(pruned_subgroups), self.k),
+#         ):
 
-            if overlap < best_overlap:
-                print("NEW overlap:", overlap, "previous:", best_overlap)
-                best_overlap = overlap
-                self.top_subs = candidates
+#             if self.are_groups_valid(candidates, self.max_overlap):
+#                 cate = sum([c["t_est"] for c in candidates])
+#                 if cate > best_cate:
+#                     print("NEW CATE:", cate / self.k, "previous:", best_cate / self.k)
+#                     best_cate = cate
+#                     self.top_subs = candidates
 
-            if best_overlap == 0:
-                return
+
+# class ExhaustiveOverlap(TopK):
+#     def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
+#         super().__init__(alg)
+#         self.percentile = percentile
+
+#     def scan(self):
+#         self.compute_overlap_matrix(self.alg.valid_subgroups)
+#         best_overlap = 999999
+
+#         subs = sorted(self.valid_subs, key=lambda x: x["t_est"], reverse=True)
+#         self.max_t = subs[0]["t_est"]
+
+#         percentile_index = int(self.percentile * self.n_valid)
+#         pruned_subgroups = subs[:percentile_index]
+
+#         for candidates in tqdm(
+#             itertools.combinations(pruned_subgroups, self.k),
+#             total=comb(len(pruned_subgroups), self.k),
+#         ):
+#             for s1 in candidates:
+#                 overlap = sum([self.op_matrix[s1["id"]][s2["id"]] for s2 in candidates])
+
+#             if overlap < best_overlap:
+#                 print("NEW overlap:", overlap, "previous:", best_overlap)
+#                 best_overlap = overlap
+#                 self.top_subs = candidates
+
+#             if best_overlap == 0:
+#                 return
 
 
 class LevelBased(TopK):
@@ -379,7 +405,7 @@ class LevelBased(TopK):
                 levels[level], key=lambda x: x["t_est"], reverse=True
             )
             cate = sum([c["t_est"] for c in levels[level][0 : self.k]])
-            print("Level", level, "CATE:", cate)
+            # print("Level", level, "AVG(CATE):", round(cate / self.k, 2))
             if cate > best_cate:
                 best_cate = cate
                 best_ids = [c["id"] for c in levels[level][0 : self.k]]
@@ -387,6 +413,28 @@ class LevelBased(TopK):
         return best_ids
 
 
+class LastLevel(TopK):
+    def __init__(self, alg: CT):
+        super().__init__(alg)
+
+    def scan(self):
+        levels = {}
+        max_level = 0
+
+        for id in self.valid_subs:
+            sub = self.get_sub(id)
+            if sub["depth"] not in levels:
+                levels[sub["depth"]] = []
+                max_level = max(max_level, sub["depth"])
+            levels[sub["depth"]].append(sub)
+
+        levels[max_level] = sorted(
+            levels[max_level], key=lambda x: x["t_est"], reverse=True
+        )
+
+        return [c["id"] for c in levels[max_level][0 : self.k]]
+
+
 greedy = [ConstrainedJ, ConstrainedT, Weighted]
-exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
-all = greedy + [Random, LevelBased]
+# exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
+all = greedy + [Random, LevelBased, LastLevel]

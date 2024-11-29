@@ -9,7 +9,7 @@ class DATA:
 
 class CT:
     MAX_DEPTH = None
-    MIN_SAMPLES_LEAF = 30
+    MIN_SAMPLES_LEAF = 50
     CRITERION = "causal_mse"
 
 
@@ -19,7 +19,7 @@ class CF:
     MAX_DEPTH = None
     CV = 2
     MIN_SAMPLES_SPLIT = 50
-    MIN_SAMPLES_LEAF = 30
+    MIN_SAMPLES_LEAF = 50
     MAX_FEATURES = "auto"
 
 

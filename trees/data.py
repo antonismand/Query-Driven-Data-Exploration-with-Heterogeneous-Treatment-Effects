@@ -153,18 +153,22 @@ class Data:
         valid_subgroups = []
         pruned_min_rows = 0
         pruned_not_subsets = 0
-        for id, sub in subgroups.items():
-            r = f"{self.p} AND {sub['condition']}"
-            df = self.execute(r)
-            if df.shape[0] > min_rows:
-                if self.pp.includes(sub["combined"]):
-                    valid_subgroups.append(id)
-
+        valid_parents = set()
+        for id, sub in reversed(subgroups.items()):
+            if self.pp.includes(sub["combined"]):
+                if id not in valid_parents:
+                    r = f"{self.p} AND {sub['condition']}"
+                    df = self.execute(r)
+                    if df.shape[0] > min_rows:
+                        valid_subgroups.append(id)
+                        valid_parents.update(sub["parents"])
+                    else:
+                        pruned_min_rows += 1
+                        # print(opt["combined"], "not subset")
                 else:
-                    pruned_not_subsets += 1
-                    # print(opt["combined"], "not subset")
+                    valid_subgroups.append(id)
             else:
-                pruned_min_rows += 1
+                pruned_not_subsets += 1
 
         end = time()
         # for accepted in accepted_subgroups:
