@@ -33,7 +33,7 @@ class TopK:
             raise ValueError("no P given")
 
         if self.n_valid <= k:
-            raise ValueError(f"Valid subgroups less than K= {k}")
+            raise ValueError(f"Valid subgroups less than K={k}")
 
         self.k = k
 
@@ -42,6 +42,9 @@ class TopK:
         scan_time = round(time() - start, 3)
 
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
+
+        if len(final_recs) < self.k:
+            raise ValueError(f"Could not find {self.k} valid subgroups")
 
         for s in final_recs:
             r = f"{self.D.p} AND {s['condition']}"
@@ -401,14 +404,15 @@ class LevelBased(TopK):
         best_cate = 0
         best_ids = []
         for level in levels:
-            levels[level] = sorted(
-                levels[level], key=lambda x: x["t_est"], reverse=True
-            )
-            cate = sum([c["t_est"] for c in levels[level][0 : self.k]])
-            # print("Level", level, "AVG(CATE):", round(cate / self.k, 2))
-            if cate > best_cate:
-                best_cate = cate
-                best_ids = [c["id"] for c in levels[level][0 : self.k]]
+            if len(levels[level]) >= self.k:
+                levels[level] = sorted(
+                    levels[level], key=lambda x: x["t_est"], reverse=True
+                )
+                cate = sum([c["t_est"] for c in levels[level][0 : self.k]])
+                # print("Level", level, "AVG(CATE):", round(cate / self.k, 2))
+                if cate > best_cate:
+                    best_cate = cate
+                    best_ids = [c["id"] for c in levels[level][0 : self.k]]
 
         return best_ids
 
@@ -419,20 +423,23 @@ class LastLevel(TopK):
 
     def scan(self):
         levels = {}
-        max_level = 0
+        level = 0
 
         for id in self.valid_subs:
             sub = self.get_sub(id)
             if sub["depth"] not in levels:
                 levels[sub["depth"]] = []
-                max_level = max(max_level, sub["depth"])
+                level = max(level, sub["depth"])
             levels[sub["depth"]].append(sub)
 
-        levels[max_level] = sorted(
-            levels[max_level], key=lambda x: x["t_est"], reverse=True
-        )
+        level_keys = sorted(levels.keys())
+        while len(levels[level]) < self.k:
+            level = level_keys.pop()
+            # print("Trying level", level)
 
-        return [c["id"] for c in levels[max_level][0 : self.k]]
+        levels[level] = sorted(levels[level], key=lambda x: x["t_est"], reverse=True)
+
+        return [c["id"] for c in levels[level][0 : self.k]]
 
 
 greedy = [ConstrainedJ, ConstrainedT, Weighted]
