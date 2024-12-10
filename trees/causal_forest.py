@@ -1,5 +1,6 @@
 from time import time
 from econml.dml import CausalForestDML
+from loguru import logger
 import pandas as pd
 from tqdm import tqdm
 from trees.data import Data
@@ -148,7 +149,7 @@ class CF:
     def get_important_features(self, threshold=0.01):
         important_features = []
         for i, fi in enumerate(self.forest.feature_importances_):
-            print(f"{self.features[i]}: {fi}")
+            logger.trace(f"{self.features[i]}: {fi}")
             if fi > threshold:
                 important_features.append(self.features[i])
         return important_features
@@ -228,33 +229,28 @@ class CFT(CF):
         self.online_time = round(time() - start, 2)
 
 
-def parameter_tuning(param_name, param_values, iterations=10, scan_method=TopK):
+def parameter_tuning(
+    param_name, param_values, data_iterations=1, user_iterations=10, scanners=[]
+):
     from trees.experiment import plots
 
     scores = pd.DataFrame()
-    for p in param_values:
-        print(f"{param_name}: {p}")
-        for exp in tqdm(range(iterations)):
-
+    for p in tqdm(param_values):
+        # print(f"{param_name}: {p}")
+        for exp in range(data_iterations):
             D = Data()
             D.generate(seed=exp)
-            D.generate_random_condition(print_condition=False)
 
-            cf = CF(scan_method)
+            cf = CFT()
             cf.fit(D=D, **{param_name: p})
-            cf.online()
 
-            scanner = scan_method(cf.valid_options, cf.op_matrix, D)
-            score = scanner.get_topK()
-            score[param_name] = p
-            scores = pd.concat([scores, score], ignore_index=True)
-
-            cft = CFT(scan_method)
-            cft.fit(D=D, **{param_name: p})
-            cft.online()
-            scanner = scan_method(cft.valid_options, cft.op_matrix, D)
-            score = scanner.get_topK()
-            score[param_name] = p
-            scores = pd.concat([scores, score], ignore_index=True)
+            for _ in range(user_iterations):
+                D.generate_random_condition()
+                cf.online()
+                for scanner in scanners:
+                    scan = scanner(alg=cf)
+                    score = scan.get_topK()
+                    score[param_name] = p
+                    scores = pd.concat([scores, score], ignore_index=True)
 
     plots(param_name, scores)

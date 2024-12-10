@@ -1,6 +1,7 @@
 from copy import deepcopy
 from time import time
 from causalml.inference.tree import CausalTreeRegressor
+from loguru import logger
 import matplotlib.pyplot as plt
 from causalml.inference.tree.plot import plot_causal_tree
 import pandas as pd
@@ -75,7 +76,6 @@ class CT:
         prev_combined: dict[str, tuple] = {},
         depth=0,
         parents: list = [],
-        print_tree=False,
     ):
 
         cate = round(self.tree.value[node_id][1][0] - self.tree.value[node_id][0][0], 3)
@@ -108,8 +108,8 @@ class CT:
             if parent_id != 0:
                 parents.append(parent_id)
 
-            if print_tree:
-                print(f"{depth * '  '}{full_condition},  CATE: {cate}")
+            logger.trace(f"{depth * '  '}{full_condition},  CATE: {cate}")
+            # logger.trace(f"{depth * '  '}{node_id},  parents: {parents}")
 
             self.subgroups[node_id] = {
                 "id": node_id,
@@ -125,8 +125,7 @@ class CT:
             }
 
         else:
-            if print_tree:
-                print(rf"Root $\hat{{\tau}}(x)$: {cate}")
+            logger.trace(rf"Root $\hat{{\tau}}(x)$: {cate}")
 
         if self.tree.children_left[node_id] != -1 and depth < self.parse_depth:
             self.parse_tree(
@@ -136,7 +135,6 @@ class CT:
                 prev_conditions=full_condition,
                 prev_combined=combined,
                 depth=depth + 1,
-                print_tree=print_tree,
                 parents=parents[:],
             )
             self.parse_tree(
@@ -146,7 +144,6 @@ class CT:
                 prev_conditions=full_condition,
                 prev_combined=combined,
                 depth=depth + 1,
-                print_tree=print_tree,
                 parents=parents[:],
             )
 
@@ -183,5 +180,5 @@ class CTP(CT):
         )
 
         self.valid_subgroups = [x for x in self.subgroups.keys()]
-        print("Subgroups:", len(self.subgroups))
+        logger.debug("Subgroups: {}", len(self.valid_subgroups))
         self.online_time = round(time() - start, 2)

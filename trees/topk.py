@@ -3,6 +3,7 @@ import itertools
 from math import comb
 from time import time
 
+from loguru import logger
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -33,7 +34,9 @@ class TopK:
             raise ValueError("no P given")
 
         if self.n_valid <= k:
-            raise ValueError(f"Valid subgroups less than K={k}")
+            error = f"{self.alg.algorithm} with {self.name} - Valid subgroups ({self.n_valid}) less than K ({k})"
+            logger.error(error)
+            raise ValueError(error)
 
         self.k = k
 
@@ -44,7 +47,9 @@ class TopK:
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
         if len(final_recs) < self.k:
-            raise ValueError(f"Could not find {self.k} valid subgroups")
+            error = f"{self.alg.algorithm} with {self.name} - could not find {self.k} valid subgroups"
+            logger.error(error)
+            raise ValueError(error)
 
         for s in final_recs:
             r = f"{self.D.p} AND {s['condition']}"
@@ -55,7 +60,7 @@ class TopK:
                     "topK_algorithm": self.name,
                     "topK_execution_time": scan_time,
                     "online_execution_time": self.alg.online_time,
-                    "total_options": self.n_subgroups,
+                    "total_subgroups": self.n_subgroups,
                     "rows": self.D.n_rows(r),
                     "overlap": self.compute_overlap_for_sub(
                         recs, s["id"], sub_in_subs=True
@@ -68,7 +73,7 @@ class TopK:
                 {
                     "t_error": abs(s["t"] - s["t_est"]),
                     "t_r_error": abs(s["t_r"] - s["t"]),
-                    "invalid_options": s["total_options"] - self.n_valid,
+                    "valid_subgroups": self.n_valid,
                 }
             )
 

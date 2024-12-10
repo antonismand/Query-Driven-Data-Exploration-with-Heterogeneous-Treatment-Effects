@@ -3,13 +3,9 @@ from causalml.dataset import synthetic_data
 import polars as pl
 import numpy as np
 import pandas as pd
-from trees import params
-
-
-from tqdm import tqdm
-
+from trees.params import DATA, P
 from trees.parser import Predicate
-from copy import deepcopy
+from loguru import logger
 
 
 class Data:
@@ -18,11 +14,11 @@ class Data:
 
     def generate(
         self,
-        n=params.DATA.N_ROWS,
-        p=params.DATA.N_FEATURES,
-        sigma=params.DATA.SIGMA,
-        seed=params.DATA.SEED,
-        mode=params.DATA.MODE,
+        n=DATA.N_ROWS,
+        p=DATA.N_FEATURES,
+        sigma=DATA.SIGMA,
+        seed=DATA.SEED,
+        mode=DATA.MODE,
         override_p_with_2=False,
     ):
         np.random.seed(seed)
@@ -88,7 +84,7 @@ class Data:
         return self.n_rows(condition) / self.df.shape[0]
 
     def generate_random_condition(
-        self, min_s=0.3, max_s=0.95, features_in_P="all", print_condition=True
+        self, min_s=P.MIN_S, max_s=P.MAX_S, features_in_P=P.FEATURES_IN_P
     ):
         while True:
             if features_in_P == "all":
@@ -109,8 +105,7 @@ class Data:
 
             if s > min_s and s < max_s:
                 self.user_condition(full_cond)
-                if print_condition:
-                    print("User condition:", full_cond, "Selectivity:", s)
+                logger.debug(f"User condition: {full_cond}, Selectivity: {s}")
                 return full_cond, s
 
     def random_condition_on_feature(self, feature):
@@ -136,7 +131,7 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def get_valid_subgroups(self, subgroups: dict, min_rows=params.DATA.N_MIN_ROWS):
+    def get_valid_subgroups(self, subgroups: dict, min_rows=DATA.N_MIN_ROWS):
         """
         Get valid subgroups based on the provided Predicate.
 
@@ -175,12 +170,13 @@ class Data:
         #     accepted["validate_time"] = round(end - start, 2)
         #     accepted["pruned_min_rows"] = pruned_min_rows
         #     accepted["pruned_not_subsets"] = pruned_not_subsets
-        print(
-            "Total subgroups:", len(subgroups), "Valid subgroups:", len(valid_subgroups)
+
+        logger.debug(
+            f"Total subgroups: {len(subgroups)}, Valid subgroups: {len(valid_subgroups)}"
         )
-        print("Filtered due to min rows:", pruned_min_rows)
-        print("Filtered due to not being subsets:", pruned_not_subsets)
-        print("Filtering Time:", round(end - start, 2))
+        logger.debug(f"Filtered due to min rows: {pruned_min_rows}")
+        logger.debug(f"Filtered due to not being subsets: {pruned_not_subsets}")
+        logger.debug(f"Filtering Time: {round(end - start, 2)}")
 
         return valid_subgroups
 

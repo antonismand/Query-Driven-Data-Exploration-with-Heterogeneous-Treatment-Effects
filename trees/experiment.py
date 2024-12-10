@@ -1,27 +1,33 @@
 import inspect
 from itertools import product
-from time import time
+import sys
+import time
+import humanize
 from matplotlib import pyplot as plt
 import pandas as pd
 from tqdm import tqdm
 import seaborn as sns
-from IPython.display import clear_output
 
-
-from trees.causal_tree import CT
+from loguru import logger
 from trees.data import Data
 from trees.topk import *
+from trees.causal_tree import CT, CTP
+from trees.causal_forest import CFT
+from trees.topk import *
+from trees.params import DEBUG_LEVEL
+
+logger.configure(handlers=[{"sink": sys.stderr, "level": DEBUG_LEVEL}])
 
 
 class Experiment:
     def __init__(
         self,
         var_name: str,
-        data_iterations=5,
-        user_iterations=5,
-        algorithms=[],
-        scanners=[],
-        save_csv=True,
+        data_iterations=1,
+        user_iterations=10,
+        cate_models=[CT, CTP, CFT],
+        topk_methods=all,
+        save_csv=False,
         **kwargs,
     ):
         scores = pd.DataFrame()
@@ -35,53 +41,54 @@ class Experiment:
         topK_params = self.get_signature(TopK(None).get_topK, kwargs)
         topK_keys = list(topK_params.keys())
 
+        start_total = time()
+
         for data_values in product(*data_params.values()):
             param_dict = dict(zip(data_keys, data_values))
 
-            for exp in tqdm(range(data_iterations)):
+            for exp in range(data_iterations):
                 data = Data()
                 param_dict["seed"] = exp
-                print("-" * 20, "New data", "-" * 20)
-                print("Generating data", param_dict)
+                logger.info("Generating data: {}", param_dict)
                 data.generate(**param_dict)
 
-                for alg in algorithms:
+                cts = [ct() for ct in cate_models]
+                for ct in cts:
                     start = time()
-                    alg.fit(D=data)
-                    end = round(time() - start, 2)
-                    print(f"{alg.algorithm} - Offline time: {end}s")
+                    ct.fit(D=data)
+                    logger.info(
+                        f"\t {ct.algorithm} - Offline time: {humanize.precisedelta(time() - start)}"
+                    )
 
                 for j in range(user_iterations):
                     for condition_values in product(*condition_params.values()):
                         condition_dict = dict(zip(condition_keys, condition_values))
-                        print(
-                            "-" * 10,
-                            "Condition",
+                        logger.info(
+                            "\t\t Generating P {}/{}: {}",
                             j + 1,
-                            "out of",
                             user_iterations,
-                            "-" * 10,
+                            condition_dict,
                         )
-                        print("Generating random condition", condition_dict)
+
                         data.generate_random_condition(**condition_dict)
 
-                        for alg in algorithms:
-                            print(f"{alg.algorithm} running")
+                        for ct in cts:
+                            # logger.info(f"{ct.algorithm} running")
                             start = time()
-                            alg.online()
-                            end = round(time() - start, 2)
-                            print(f"{alg.algorithm} - Online time: {end}s")
+                            ct.online()
+                            logger.info(
+                                f"\t\t\t {ct.algorithm} - Online time: {humanize.precisedelta(time() - start)}"
+                            )
 
                             for topK_values in product(*topK_params.values()):
                                 topK_dict = dict(zip(topK_keys, topK_values))
 
-                                for scanner in scanners:
+                                for topk_method in topk_methods:
                                     start = time()
-                                    scan = scanner(alg=alg)
-                                    score = scan.get_topK(**topK_dict)
-                                    end = round(time() - start, 2)
-                                    print(
-                                        f"{scan.name} - get topK in {end}s - {str(topK_dict)}"
+                                    topk = topk_method(alg=ct)
+                                    score = topk.get_topK(**topK_dict)
+                                    logger.info(
+                                        f"\t\t\t\t {topk.name}: {humanize.precisedelta(time() - start)} - {str(topK_dict)}"
                                     )
 
                                     current_combination = {
@@ -97,16 +104,23 @@ class Experiment:
 
                 # clear_output(wait=True)
 
-        print(
-            "Finished",
-            data_iterations,
-            "data iterations with",
-            user_iterations,
-            "user interactions",
+        logger.success(
+            f"Finished experiment in {humanize.precisedelta(time() - start_total)} with {data_iterations} data iterations and {user_iterations} user iterations"
         )
-        print("data params", data_params)
-        print("condition params", condition_params)
-        print("topK params", topK_params)
+        logger.success("D params: {}", data_params)
+        logger.success("P params: {}", condition_params)
+        logger.success(
+            "topK params: {}",
+            {k: v for k, v in vars(params.TOPK).items() if not k.startswith("__")},
+        )
+        logger.success(
+            "CT Params: {}",
+            {k: v for k, v in vars(params.CT).items() if not k.startswith("__")},
+        )
+        logger.success(
+            "CF Params: {}",
+            {k: v for k, v in vars(params.CF).items() if not k.startswith("__")},
+        )
 
         plots(var_name, scores)
         if save_csv:
@@ -202,16 +216,16 @@ def plots(param_name, scores):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     sns.barplot(
-        x=param_name, y="total_options", hue="algorithm", data=scores, ax=axs[0]
+        x=param_name, y="total_subgroups", hue="algorithm", data=scores, ax=axs[0]
     )
-    axs[0].set_title(f"Total options")
+    axs[0].set_title(f"Total subgroups")
     axs[0].tick_params(axis="x", labelrotation=30)
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(
-        x=param_name, y="invalid_options", hue="algorithm", data=scores, ax=axs[1]
+        x=param_name, y="valid_subgroups", hue="algorithm", data=scores, ax=axs[1]
     )
-    axs[1].set_title(f"Invalid options")
+    axs[1].set_title(f"Valid subgroups")
     axs[1].tick_params(axis="x", labelrotation=30)
     axs[1].legend([], [], frameon=False)
     plt.show()
@@ -238,15 +252,17 @@ def plots(param_name, scores):
     sns.barplot(
         x=param_name, y="online_execution_time", hue="algorithm", data=scores, ax=axs[0]
     )
-    axs[0].set_title(f"Online Execution Time")
+    axs[0].set_title(f"Filtering Time")
     axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].set_ylabel("Time (s)")
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(
         x=param_name, y="topK_execution_time", hue="algorithm", data=scores, ax=axs[1]
     )
-    axs[1].set_title(f"TopK execution time")
+    axs[1].set_title(f"TopK time")
     axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].set_ylabel("Time (s)")
     axs[1].legend([], [], frameon=False)
     plt.show()
 
