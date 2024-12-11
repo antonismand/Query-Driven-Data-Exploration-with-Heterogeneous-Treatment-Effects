@@ -26,7 +26,7 @@ class Experiment:
         data_iterations=1,
         user_iterations=10,
         cate_models=[CT, CTP, CFT],
-        topk_methods=all,
+        topk_methods=main_competitors,
         save_csv=False,
         **kwargs,
     ):

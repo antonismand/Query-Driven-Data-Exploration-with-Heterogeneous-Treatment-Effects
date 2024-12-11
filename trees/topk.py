@@ -30,26 +30,39 @@ class TopK:
         pass
 
     def get_topK(self, k=params.TOPK.K):
+        self.k = k
+
         if self.D.p is None:
             raise ValueError("no P given")
 
-        if self.n_valid <= k:
-            error = f"{self.alg.algorithm} with {self.name} - Valid subgroups ({self.n_valid}) less than K ({k})"
-            logger.error(error)
-            raise ValueError(error)
-
-        self.k = k
-
         start = time()
-        recs = self.scan()  # ids
+
+        if self.n_valid == 0:
+            logger.warning(f"{self.alg.algorithm} - No valid subgroups - skipping topK")
+            return pd.DataFrame([])
+        elif self.n_valid <= k:
+            logger.warning(
+                f"{self.alg.algorithm} - Valid subgroups ({self.n_valid}) less than K ({k}) - skipping topK"
+            )
+            recs = self.valid_subs
+        else:  # sort using topK method
+            recs = self.scan()  # ids
+
         scan_time = round(time() - start, 3)
 
-        final_recs: list[dict] = [self.copy_sub(s) for s in recs]
+        if len(recs) == 0:
+            logger.warning(
+                f"{self.alg.algorithm} with {self.name} - could not find any valid subgroups"
+            )
+            return pd.DataFrame([])
 
-        if len(final_recs) < self.k:
-            error = f"{self.alg.algorithm} with {self.name} - could not find {self.k} valid subgroups"
-            logger.error(error)
-            raise ValueError(error)
+        elif len(recs) < self.k and self.n_valid > self.k:
+            logger.warning(
+                f"{self.alg.algorithm} with {self.name} - could not find {self.k} subgroups out of {self.n_valid} valid subgroups"
+            )
+            return pd.DataFrame([])
+
+        final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
         for s in final_recs:
             r = f"{self.D.p} AND {s['condition']}"
@@ -438,7 +451,8 @@ class LastLevel(TopK):
             levels[sub["depth"]].append(sub)
 
         level_keys = sorted(levels.keys())
-        while len(levels[level]) < self.k:
+
+        while len(levels[level]) < self.k and len(level_keys) > 0:
             level = level_keys.pop()
             # print("Trying level", level)
 
@@ -448,5 +462,6 @@ class LastLevel(TopK):
 
 
 greedy = [ConstrainedJ, ConstrainedT, Weighted]
+main_competitors = greedy + [LevelBased]
 # exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
 all = greedy + [Random, LevelBased, LastLevel]

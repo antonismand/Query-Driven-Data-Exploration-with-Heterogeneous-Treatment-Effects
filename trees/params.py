@@ -1,6 +1,6 @@
 class DATA:
     N_MIN_ROWS = 30
-    N_ROWS = 100000
+    N_ROWS = 10000
     N_FEATURES = 10
     SIGMA = 3.0
     SEED = 42
