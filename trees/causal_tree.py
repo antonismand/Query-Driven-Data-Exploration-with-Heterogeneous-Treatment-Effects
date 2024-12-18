@@ -178,6 +178,8 @@ class CTP(CT):
             min_samples_leaf=self.min_samples_leaf,
             on="P",
         )
+        for sub in self.subgroups.values():
+            sub["condition"] = self.D.p + " AND " + sub["condition"]
 
         self.valid_subgroups = [x for x in self.subgroups.keys()]
         logger.debug("Subgroups: {}", len(self.valid_subgroups))

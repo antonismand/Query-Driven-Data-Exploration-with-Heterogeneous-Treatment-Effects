@@ -81,11 +81,16 @@ class TopK:
                     # "score": self.get_score(recs, s["id"]),
                 }
             )
+            t_r_error = abs(s["t_r"] - s["t"])
+            if t_r_error > 0.15:
+                logger.warning(
+                    f"{self.alg.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
+                )
 
             s.update(
                 {
                     "t_error": abs(s["t"] - s["t_est"]),
-                    "t_r_error": abs(s["t_r"] - s["t"]),
+                    "t_r_error": t_r_error,
                     "valid_subgroups": self.n_valid,
                 }
             )
@@ -462,6 +467,6 @@ class LastLevel(TopK):
 
 
 greedy = [ConstrainedJ, ConstrainedT, Weighted]
-main_competitors = greedy + [LevelBased]
+main_competitors = greedy + [LevelBased, Random]
 # exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
 all = greedy + [Random, LevelBased, LastLevel]

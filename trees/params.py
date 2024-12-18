@@ -1,6 +1,6 @@
 class DATA:
     N_MIN_ROWS = 30
-    N_ROWS = 10000
+    N_ROWS = 100000
     N_FEATURES = 10
     SIGMA = 3.0
     SEED = 42
@@ -30,12 +30,12 @@ class CF:
 
 
 class TOPK:
-    W = 0.5
+    W = 0.7
     K = 5
     MAX_PAIRWISE_OVERLAP = 0.5
     PERCENTILE = 0.7
 
 
 # DEBUG_LEVEL = "DEBUG"
-# DEBUG_LEVEL = "INFO"
-DEBUG_LEVEL = "SUCCESS"
+DEBUG_LEVEL = "INFO"
+# DEBUG_LEVEL = "SUCCESS"

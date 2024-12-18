@@ -3,10 +3,12 @@ from itertools import product
 import sys
 import time
 import humanize
+import seaborn as sns
+import tikzplotlib
 from matplotlib import pyplot as plt
 import pandas as pd
 from tqdm import tqdm
-import seaborn as sns
+import matplotlib as mpl
 
 from loguru import logger
 from trees.data import Data
@@ -15,6 +17,8 @@ from trees.causal_tree import CT, CTP
 from trees.causal_forest import CFT
 from trees.topk import *
 from trees.params import DEBUG_LEVEL
+
+mpl.rcParams.update(mpl.rcParamsDefault)
 
 logger.configure(handlers=[{"sink": sys.stderr, "level": DEBUG_LEVEL}])
 
@@ -30,7 +34,8 @@ class Experiment:
         save_csv=False,
         **kwargs,
     ):
-        scores = pd.DataFrame()
+        self.scores = pd.DataFrame()
+        self.var_name = var_name
 
         data_params = self.get_signature(Data().generate, kwargs)
         data_keys = list(data_params.keys())
@@ -98,8 +103,8 @@ class Experiment:
                                     }
                                     if var_name in current_combination:
                                         score[var_name] = current_combination[var_name]
-                                    scores = pd.concat(
-                                        [scores, score], ignore_index=True
+                                    self.scores = pd.concat(
+                                        [self.scores, score], ignore_index=True
                                     )
 
                 # clear_output(wait=True)
@@ -122,9 +127,9 @@ class Experiment:
             {k: v for k, v in vars(params.CF).items() if not k.startswith("__")},
         )
 
-        plots(var_name, scores)
+        plots(var_name, self.scores)
         if save_csv:
-            scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
+            self.scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
 
     def get_signature(self, func, kwargs):
         signature = inspect.signature(func)
@@ -136,6 +141,64 @@ class Experiment:
                 parameters[param_name] = [param.default]
 
         return parameters
+
+    def save_tikzplot(self):
+        plt.figure()
+        ax = sns.barplot(x=self.var_name, y="t_r", hue="algorithm", data=self.scores)
+        ax.set_title("True CATE (higher is better)")
+        ax.set_ylabel(r"$|\tau(R_i)|$")
+        ax.tick_params(axis="x", labelrotation=20)
+        ax.set_xlabel(r"top-$K$ Algorithm")
+
+        ax.legend(fontsize="x-small")
+        plt.draw()
+
+        # tikzplotlib.clean_figure()
+        tikzplotlib.save(
+            f"../tex/{self.var_name}-t.tex",
+            extra_axis_parameters=[
+                "scaled x ticks=false",
+                "scaled y ticks=false",
+                "yticklabel style={/pgf/number format/precision=3}",
+                "xticklabel style={font=\small}",
+                "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
+            ],
+            axis_height="\\figH",
+            axis_width="\\figW",
+        )
+
+        plt.figure()
+        ax = sns.barplot(
+            x=self.var_name, y="overlap", hue="algorithm", data=self.scores
+        )
+        ax.set_title("Overlap (lower is better)")
+        ax.set_ylabel("Overlap")
+        ax.tick_params(axis="x", labelrotation=20)
+        ax.set_xlabel(r"top-$K$ Algorithm")
+        ax.legend(fontsize="x-small")
+
+        plt.draw()
+
+        # tikzplotlib.clean_figure()
+        tikzplotlib.save(
+            f"../tex/{self.var_name}-overlap.tex",
+            extra_axis_parameters=[
+                "scaled x ticks=false",
+                "scaled y ticks=false",
+                "yticklabel style={/pgf/number format/precision=4}",
+                "xticklabel style={font=\small}",
+                "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
+            ],
+            axis_height="\\figH",
+            axis_width="\\figW",
+        )
+
+
+class LoadExperiment(Experiment):
+    def __init__(self, var_name):
+        self.scores = pd.read_csv(f"../csv/scores_{var_name}.csv")
+        self.var_name = var_name
+        plots(var_name, self.scores)
 
 
 def plots(param_name, scores):
