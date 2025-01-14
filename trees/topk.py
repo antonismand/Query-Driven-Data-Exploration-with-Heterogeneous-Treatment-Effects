@@ -78,6 +78,7 @@ class TopK:
                     "overlap": self.compute_overlap_for_sub(
                         recs, s["id"], sub_in_subs=True
                     ),
+                    "K": len(recs),
                     # "score": self.get_score(recs, s["id"]),
                 }
             )
@@ -239,8 +240,8 @@ class ConstrainedJ(TopK):
                     return recs
 
         if len(recs) < self.k:
-            raise ValueError(
-                f"Not enough valid subgroups to satisfy max_overlap={self.max_overlap}"
+            logger.warning(
+                f"{self.alg.algorithm} - ConstrainedJ -  Not enough valid subgroups to satisfy max_overlap={self.max_overlap}"
             )
         return recs
 
@@ -466,7 +467,6 @@ class LastLevel(TopK):
         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-greedy = [ConstrainedJ, ConstrainedT, Weighted]
-main_competitors = greedy + [LevelBased, Random]
+main_competitors = [ConstrainedJ, Weighted, ConstrainedT, LevelBased, Random]
 # exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
-all = greedy + [Random, LevelBased, LastLevel]
+all = main_competitors + [LastLevel]

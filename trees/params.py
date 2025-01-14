@@ -1,5 +1,5 @@
 class DATA:
-    N_MIN_ROWS = 30
+    N_MIN_ROWS = 20
     N_ROWS = 100000
     N_FEATURES = 10
     SIGMA = 3.0
@@ -14,18 +14,18 @@ class P:
 
 
 class CT:
-    MAX_DEPTH = None
-    MIN_SAMPLES_LEAF = 50
+    MAX_DEPTH = 15
+    MIN_SAMPLES_LEAF = 20
     CRITERION = "causal_mse"
 
 
 class CF:
     CRITERION = "mse"
     N_ESTIMATORS = 64
-    MAX_DEPTH = None
+    MAX_DEPTH = 12
     CV = 2
-    MIN_SAMPLES_SPLIT = 50
-    MIN_SAMPLES_LEAF = 50
+    MIN_SAMPLES_SPLIT = 30
+    MIN_SAMPLES_LEAF = 20
     MAX_FEATURES = "auto"
 
 

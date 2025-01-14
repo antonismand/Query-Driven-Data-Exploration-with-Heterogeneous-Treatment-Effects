@@ -256,9 +256,11 @@ def plots(param_name, scores):
     axs[0].tick_params(axis="x", labelrotation=30)
     axs[0].legend(fontsize="x-small")
 
-    # sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
-    # axs[1].set_title(f"Predicted Score")
-    # axs[1].legend([], [], frameon=False)
+    sns.barplot(x=param_name, y="K", hue="algorithm", data=scores, ax=axs[1])
+    axs[1].set_title(f"K")
+    axs[1].set_ylabel("K")
+    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].legend([], [], frameon=False)
     plt.show()
 
     # ----------------- #

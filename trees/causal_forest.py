@@ -230,27 +230,27 @@ class CFT(CF):
 
 
 def parameter_tuning(
-    param_name, param_values, data_iterations=1, user_iterations=10, scanners=[]
+    param_name, param_values, n_rows=params.DATA.N_ROWS, user_iterations=50, scanners=[]
 ):
     from trees.experiment import plots
 
     scores = pd.DataFrame()
+
+    D = Data()
+    D.generate(seed=34, n=n_rows)
+
+    # print(f"{param_name}: {p}")
     for p in tqdm(param_values):
-        # print(f"{param_name}: {p}")
-        for exp in range(data_iterations):
-            D = Data()
-            D.generate(seed=exp)
+        cf = CFT()
+        cf.fit(D=D, **{param_name: p})
 
-            cf = CFT()
-            cf.fit(D=D, **{param_name: p})
-
-            for _ in range(user_iterations):
-                D.generate_random_condition()
-                cf.online()
-                for scanner in scanners:
-                    scan = scanner(alg=cf)
-                    score = scan.get_topK()
-                    score[param_name] = p
-                    scores = pd.concat([scores, score], ignore_index=True)
+        for _ in range(user_iterations):
+            D.generate_random_condition()
+            cf.online()
+            for scanner in scanners:
+                scan = scanner(alg=cf)
+                score = scan.get_topK()
+                score[param_name] = p
+                scores = pd.concat([scores, score], ignore_index=True)
 
     plots(param_name, scores)
