@@ -22,7 +22,7 @@ class CT:
         max_depth=params.CT.MAX_DEPTH,
         min_samples_leaf=params.CT.MIN_SAMPLES_LEAF,
         on="D",
-        train_in_all_features=True,
+        train_in_all_features=params.CT.TRAIN_IN_ALL_FEATURES,
     ):
         self.D = D
         if on == "D":

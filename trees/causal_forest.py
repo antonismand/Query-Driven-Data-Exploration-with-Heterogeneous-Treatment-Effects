@@ -29,7 +29,7 @@ class CF:
         min_samples_split=params.CF.MIN_SAMPLES_SPLIT,
         min_samples_leaf=params.CF.MIN_SAMPLES_LEAF,
         max_features=params.CF.MAX_FEATURES,
-        train_in_all_features=True,
+        train_in_all_features=params.CF.TRAIN_IN_ALL_FEATURES,
     ):
         self.D = D
         self.df = D.df
@@ -253,4 +253,4 @@ def parameter_tuning(
                 score[param_name] = p
                 scores = pd.concat([scores, score], ignore_index=True)
 
-    plots(param_name, scores)
+    plots(x=param_name, scores=scores)

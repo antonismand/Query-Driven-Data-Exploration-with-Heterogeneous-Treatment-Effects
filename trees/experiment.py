@@ -127,9 +127,13 @@ class Experiment:
             {k: v for k, v in vars(params.CF).items() if not k.startswith("__")},
         )
 
-        plots(var_name, self.scores)
         if save_csv:
             self.scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
+
+    def plot(self, x=None, hue="algorithm", rotation=30):
+        if x is None:
+            x = self.var_name
+        plots(x=x, hue=hue, scores=self.scores, rotation=rotation)
 
     def get_signature(self, func, kwargs):
         signature = inspect.signature(func)
@@ -142,90 +146,124 @@ class Experiment:
 
         return parameters
 
-    def save_tikzplot(self):
-        plt.figure()
-        ax = sns.barplot(x=self.var_name, y="t_r", hue="algorithm", data=self.scores)
-        ax.set_title("True CATE (higher is better)")
-        ax.set_ylabel(r"$|\tau(R_i)|$")
-        ax.tick_params(axis="x", labelrotation=20)
-        ax.set_xlabel(r"top-$K$ Algorithm")
+    def save_tikzplot(self, plots=["t", "overlap"]):
+        if "t" in plots:
+            plt.figure()
+            ax = sns.barplot(
+                x=self.var_name, y="t_r", hue="algorithm", data=self.scores
+            )
+            ax.set_title("True CATE (higher is better)")
+            ax.set_ylabel(r"$|\tau(R_i)|$")
+            ax.tick_params(axis="x", labelrotation=20)
+            ax.set_xlabel(r"top-$K$ Algorithm")
 
-        ax.legend(fontsize="x-small")
-        plt.draw()
+            ax.legend(fontsize="x-small")
+            plt.draw()
 
-        # tikzplotlib.clean_figure()
-        tikzplotlib.save(
-            f"../tex/{self.var_name}-t.tex",
-            extra_axis_parameters=[
-                "scaled x ticks=false",
-                "scaled y ticks=false",
-                "yticklabel style={/pgf/number format/precision=3}",
-                "xticklabel style={font=\small}",
-                "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
-            ],
-            axis_height="\\figH",
-            axis_width="\\figW",
-        )
+            # tikzplotlib.clean_figure()
+            tikzplotlib.save(
+                f"../tex/{self.var_name}-t.tex",
+                extra_axis_parameters=[
+                    "scaled x ticks=false",
+                    "scaled y ticks=false",
+                    "yticklabel style={/pgf/number format/precision=3}",
+                    "xticklabel style={font=\small}",
+                    "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
+                ],
+                axis_height="\\figH",
+                axis_width="\\figW",
+            )
 
-        plt.figure()
-        ax = sns.barplot(
-            x=self.var_name, y="overlap", hue="algorithm", data=self.scores
-        )
-        ax.set_title("Overlap (lower is better)")
-        ax.set_ylabel("Overlap")
-        ax.tick_params(axis="x", labelrotation=20)
-        ax.set_xlabel(r"top-$K$ Algorithm")
-        ax.legend(fontsize="x-small")
+        if "overlap" in plots:
+            plt.figure()
+            ax = sns.barplot(
+                x=self.var_name, y="overlap", hue="algorithm", data=self.scores
+            )
+            ax.set_title("Overlap (lower is better)")
+            ax.set_ylabel("Overlap")
+            ax.tick_params(axis="x", labelrotation=20)
+            ax.set_xlabel(r"top-$K$ Algorithm")
+            ax.legend(fontsize="x-small")
 
-        plt.draw()
+            plt.draw()
 
-        # tikzplotlib.clean_figure()
-        tikzplotlib.save(
-            f"../tex/{self.var_name}-overlap.tex",
-            extra_axis_parameters=[
-                "scaled x ticks=false",
-                "scaled y ticks=false",
-                "yticklabel style={/pgf/number format/precision=4}",
-                "xticklabel style={font=\small}",
-                "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
-            ],
-            axis_height="\\figH",
-            axis_width="\\figW",
-        )
+            # tikzplotlib.clean_figure()
+            tikzplotlib.save(
+                f"../tex/{self.var_name}-overlap.tex",
+                extra_axis_parameters=[
+                    "scaled x ticks=false",
+                    "scaled y ticks=false",
+                    "yticklabel style={/pgf/number format/precision=4}",
+                    "xticklabel style={font=\small}",
+                    "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
+                ],
+                axis_height="\\figH",
+                axis_width="\\figW",
+            )
+
+        if "time" in plots:
+            plt.figure()
+            ax = sns.barplot(
+                x=self.var_name,
+                y="total_execution_time",
+                hue="algorithm",
+                data=self.scores,
+            )
+            ax.set_title("Total Execution Time")
+            ax.set_ylabel("Time (s)")
+            ax.tick_params(axis="x", labelrotation=20)
+            ax.set_xlabel(r"top-$K$ Algorithm")
+            ax.legend(fontsize="x-small")
+
+            plt.draw()
+
+            # tikzplotlib.clean_figure()
+            tikzplotlib.save(
+                f"../tex/{self.var_name}-overlap.tex",
+                extra_axis_parameters=[
+                    "scaled x ticks=false",
+                    "scaled y ticks=false",
+                    "yticklabel style={/pgf/number format/precision=4}",
+                    "xticklabel style={font=\small}",
+                    "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
+                ],
+                axis_height="\\figH",
+                axis_width="\\figW",
+            )
 
 
 class LoadExperiment(Experiment):
     def __init__(self, var_name):
         self.scores = pd.read_csv(f"../csv/scores_{var_name}.csv")
         self.var_name = var_name
-        plots(var_name, self.scores)
+        # plots(x=var_name, scores=self.scores)
 
 
-def plots(param_name, scores):
+def plots(x, hue="algorithm", scores=[], rotation=30):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="t", hue="algorithm", data=scores, ax=axs[0])
+    sns.barplot(x=x, y="t", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"True CATE (higher is better)")
     axs[0].set_ylabel(r"$\tau(S_i)$")
-    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="t_est", hue="algorithm", data=scores, ax=axs[1])
+    sns.barplot(x=x, y="t_est", hue=hue, data=scores, ax=axs[1])
     axs[1].set_title(f"Estimated CATE")
     axs[1].set_ylabel(r"$\hat{\tau}(S_i)$")
-    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
     # ----------------- #
 
     # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    # sns.barplot(x=param_name, y="true_score", hue="algorithm", data=scores, ax=axs[0])
+    # sns.barplot(x=x, y="true_score", hue=hue, data=scores, ax=axs[0])
     # axs[0].set_title(f"True score (higher is better)")
     # axs[0].set_ylabel("True Score")
     # axs[0].legend(fontsize="x-small")
 
-    # sns.barplot(x=param_name, y="score", hue="algorithm", data=scores, ax=axs[1])
+    # sns.barplot(x=x, y="score", hue=hue, data=scores, ax=axs[1])
     # axs[1].set_title(f"Score")
     # axs[1].legend([], [], frameon=False)
     # plt.show()
@@ -233,65 +271,61 @@ def plots(param_name, scores):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="t_error", hue="algorithm", data=scores, ax=axs[0])
+    sns.barplot(x=x, y="t_error", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Prediction error")
     axs[0].set_ylabel(r"$|\tau(S_i) - \hat{\tau}(S_i)|$")
-    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].tick_params(axis="x", labelrotation=rotation)
 
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="t_r_error", hue="algorithm", data=scores, ax=axs[1])
+    sns.barplot(x=x, y="t_r_error", hue=hue, data=scores, ax=axs[1])
     axs[1].set_title(f"False Estimation")
     axs[1].set_ylabel(r"$|\tau(R_i) - \tau(S_i)|$")
-    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="overlap", hue="algorithm", data=scores, ax=axs[0])
+    sns.barplot(x=x, y="overlap", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Overlap")
     axs[0].set_ylabel("overlap")
-    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="K", hue="algorithm", data=scores, ax=axs[1])
+    sns.barplot(x=x, y="K", hue=hue, data=scores, ax=axs[1])
     axs[1].set_title(f"K")
     axs[1].set_ylabel("K")
-    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=param_name, y="depth", hue="algorithm", data=scores, ax=axs[0])
+    sns.barplot(x=x, y="depth", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Depth")
-    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=param_name, y="features", hue="algorithm", data=scores, ax=axs[1])
+    sns.barplot(x=x, y="features", hue=hue, data=scores, ax=axs[1])
     axs[1].set_title(f"Features")
-    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(
-        x=param_name, y="total_subgroups", hue="algorithm", data=scores, ax=axs[0]
-    )
+    sns.barplot(x=x, y="total_subgroups", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Total subgroups")
-    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(
-        x=param_name, y="valid_subgroups", hue="algorithm", data=scores, ax=axs[1]
-    )
+    sns.barplot(x=x, y="valid_subgroups", hue=hue, data=scores, ax=axs[1])
     axs[1].set_title(f"Valid subgroups")
-    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].legend([], [], frameon=False)
     plt.show()
 
@@ -299,13 +333,13 @@ def plots(param_name, scores):
 
     # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     # sns.barplot(
-    #     x=param_name, y="pruned_min_rows", hue="algorithm", data=scores, ax=axs[0]
+    #     x=x, y="pruned_min_rows", hue=hue, data=scores, ax=axs[0]
     # )
     # axs[0].set_title(f"Pruned due to min rows")
     # axs[0].legend(fontsize="x-small")
 
     # sns.barplot(
-    #     x=param_name, y="pruned_not_subsets", hue="algorithm", data=scores, ax=axs[1]
+    #     x=x, y="pruned_not_subsets", hue=hue, data=scores, ax=axs[1]
     # )
     # axs[1].set_title(f"Pruned due to not being subsets")
     # axs[1].legend([], [], frameon=False)
@@ -314,19 +348,15 @@ def plots(param_name, scores):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(
-        x=param_name, y="online_execution_time", hue="algorithm", data=scores, ax=axs[0]
-    )
+    sns.barplot(x=x, y="online_execution_time", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Filtering Time")
-    axs[0].tick_params(axis="x", labelrotation=30)
+    axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].set_ylabel("Time (s)")
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(
-        x=param_name, y="topK_execution_time", hue="algorithm", data=scores, ax=axs[1]
-    )
+    sns.barplot(x=x, y="topK_execution_time", hue=hue, data=scores, ax=axs[1])
     axs[1].set_title(f"TopK time")
-    axs[1].tick_params(axis="x", labelrotation=30)
+    axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].set_ylabel("Time (s)")
     axs[1].legend([], [], frameon=False)
     plt.show()

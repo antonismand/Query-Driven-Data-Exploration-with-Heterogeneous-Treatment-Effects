@@ -17,6 +17,7 @@ class CT:
     MAX_DEPTH = 15
     MIN_SAMPLES_LEAF = 20
     CRITERION = "causal_mse"
+    TRAIN_IN_ALL_FEATURES = False
 
 
 class CF:
@@ -27,6 +28,7 @@ class CF:
     MIN_SAMPLES_SPLIT = 30
     MIN_SAMPLES_LEAF = 20
     MAX_FEATURES = "auto"
+    TRAIN_IN_ALL_FEATURES = False
 
 
 class TOPK:

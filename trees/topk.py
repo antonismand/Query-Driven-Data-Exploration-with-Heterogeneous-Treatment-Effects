@@ -71,8 +71,10 @@ class TopK:
                     "t": self.D.CATE(s["condition"]),
                     "t_r": self.D.CATE(r),
                     "topK_algorithm": self.name,
+                    "variant": self.alg.algorithm + " " + self.name,
                     "topK_execution_time": scan_time,
                     "online_execution_time": self.alg.online_time,
+                    "total_execution_time": scan_time + self.alg.online_time,
                     "total_subgroups": self.n_subgroups,
                     "rows": self.D.n_rows(r),
                     "overlap": self.compute_overlap_for_sub(
