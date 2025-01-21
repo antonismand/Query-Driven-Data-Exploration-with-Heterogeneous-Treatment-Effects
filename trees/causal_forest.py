@@ -8,14 +8,14 @@ from econml.cate_interpreter import SingleTreeCateInterpreter
 import matplotlib.pyplot as plt
 from econml.sklearn_extensions.linear_model import WeightedLassoCVWrapper
 from sklearn.ensemble import RandomForestClassifier
-from trees.topk import TopK
 from trees import params
 
 
 class CF:
     def __init__(self):
         self.subgroups = {}
-        self.algorithm = "[Hybrid] CF"
+        self.is_online = False
+        # self.algorithm = "[Hybrid] CF"
 
     def fit(
         self,
@@ -69,7 +69,8 @@ class CF:
             self.parse_tree(tree.tree_)
 
     def online(self):
-        self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
+        self.online_time = 0
+        # self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
 
     def parse_tree(
         self,
@@ -158,7 +159,8 @@ class CF:
 class CFT(CF):
     def __init__(self):
         self.subgroups = {}
-        self.algorithm = "[Hybrid] CF"
+        self.algorithm = "[Pretrained] CF"
+        self.is_online = False
 
     def fit(
         self,
@@ -224,9 +226,10 @@ class CFT(CF):
         self.parse_tree(final_tree)
 
     def online(self):
-        start = time()
-        self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
-        self.online_time = round(time() - start, 2)
+        self.online_time = 0
+        # start = time()
+        # self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
+        # self.online_time = round(time() - start, 2)
 
 
 def parameter_tuning(

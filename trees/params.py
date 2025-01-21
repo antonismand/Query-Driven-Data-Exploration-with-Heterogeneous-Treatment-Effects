@@ -1,5 +1,4 @@
 class DATA:
-    N_MIN_ROWS = 20
     N_ROWS = 100000
     N_FEATURES = 10
     SIGMA = 3.0
@@ -36,6 +35,7 @@ class TOPK:
     K = 5
     MAX_PAIRWISE_OVERLAP = 0.5
     PERCENTILE = 0.7
+    N_MIN_ROWS = 20
 
 
 # DEBUG_LEVEL = "DEBUG"

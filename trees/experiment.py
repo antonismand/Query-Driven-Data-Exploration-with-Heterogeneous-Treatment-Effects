@@ -17,6 +17,7 @@ from trees.causal_tree import CT, CTP
 from trees.causal_forest import CFT
 from trees.topk import *
 from trees.params import DEBUG_LEVEL
+from datetime import timedelta
 
 mpl.rcParams.update(mpl.rcParamsDefault)
 
@@ -27,11 +28,12 @@ class Experiment:
     def __init__(
         self,
         var_name: str,
+        exp_name: str = None,
         data_iterations=1,
-        user_iterations=10,
+        user_iterations=20,
         cate_models=[CT, CTP, CFT],
         topk_methods=main_competitors,
-        save_csv=False,
+        save_csv=True,
         **kwargs,
     ):
         self.scores = pd.DataFrame()
@@ -62,7 +64,7 @@ class Experiment:
                     start = time()
                     ct.fit(D=data)
                     logger.info(
-                        f"\t {ct.algorithm} - Offline time: {humanize.precisedelta(time() - start)}"
+                        f"\t {ct.algorithm} - Offline time: {timedelta(seconds=(time() - start))}"
                     )
 
                 for j in range(user_iterations):
@@ -82,7 +84,7 @@ class Experiment:
                             start = time()
                             ct.online()
                             logger.info(
-                                f"\t\t\t {ct.algorithm} - Online time: {humanize.precisedelta(time() - start)}"
+                                f"\t\t\t {ct.algorithm} - Online time: {timedelta(seconds=(time() - start))}"
                             )
 
                             for topK_values in product(*topK_params.values()):
@@ -93,7 +95,7 @@ class Experiment:
                                     topk = topk_method(alg=ct)
                                     score = topk.get_topK(**topK_dict)
                                     logger.info(
-                                        f"\t\t\t\t {topk.name}: {humanize.precisedelta(time() - start)} - {str(topK_dict)}"
+                                        f"\t\t\t\t {topk.name}: {timedelta(seconds=(time() - start))} - {str(topK_dict)}"
                                     )
 
                                     current_combination = {
@@ -128,7 +130,9 @@ class Experiment:
         )
 
         if save_csv:
-            self.scores.to_csv(f"../csv/scores_{var_name}.csv", index=False)
+            if exp_name is None:
+                exp_name = var_name
+            self.scores.to_csv(f"../csv/{exp_name}.csv", index=False)
 
     def plot(self, x=None, hue="algorithm", rotation=30):
         if x is None:
@@ -234,7 +238,7 @@ class Experiment:
 
 class LoadExperiment(Experiment):
     def __init__(self, var_name):
-        self.scores = pd.read_csv(f"../csv/scores_{var_name}.csv")
+        self.scores = pd.read_csv(f"../csv/{var_name}.csv")
         self.var_name = var_name
         # plots(x=var_name, scores=self.scores)
 
@@ -323,11 +327,11 @@ def plots(x, hue="algorithm", scores=[], rotation=30):
     axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=x, y="valid_subgroups", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Valid subgroups")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].legend([], [], frameon=False)
-    plt.show()
+    # sns.barplot(x=x, y="valid_subgroups", hue=hue, data=scores, ax=axs[1])
+    # axs[1].set_title(f"Valid subgroups")
+    # axs[1].tick_params(axis="x", labelrotation=rotation)
+    # axs[1].legend([], [], frameon=False)
+    # plt.show()
 
     # ----------------- #
 
@@ -348,14 +352,14 @@ def plots(x, hue="algorithm", scores=[], rotation=30):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="online_execution_time", hue=hue, data=scores, ax=axs[0])
+    sns.barplot(x=x, y="ct_execution_time", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Filtering Time")
     axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].set_ylabel("Time (s)")
     axs[0].legend(fontsize="x-small")
 
-    sns.barplot(x=x, y="topK_execution_time", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"TopK time")
+    sns.barplot(x=x, y="total_execution_time", hue=hue, data=scores, ax=axs[1])
+    axs[1].set_title(f"Total Online time")
     axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].set_ylabel("Time (s)")
     axs[1].legend([], [], frameon=False)

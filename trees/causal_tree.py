@@ -12,7 +12,8 @@ from trees import params
 class CT:
     def __init__(self):
         self.subgroups = {}
-        self.algorithm = "[Hybrid] CT"
+        self.algorithm = "[Pretrained] CT"
+        self.is_online = False
 
     def fit(
         self,
@@ -50,9 +51,10 @@ class CT:
         self.parse_tree()
 
     def online(self):
-        start = time()
-        self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
-        self.online_time = round(time() - start, 2)
+        self.online_time = 0
+        # start = time()
+        # self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
+        # self.online_time = round(time() - start, 2)
 
     def plot_tree(self, max_depth=6):
         plt.figure(figsize=(100, 20))
@@ -152,6 +154,7 @@ class CTP(CT):
     def __init__(self):
         self.subgroups = {}
         self.algorithm = "[Online] CT"
+        self.is_online = True
 
     def fit(
         self,
@@ -181,6 +184,6 @@ class CTP(CT):
         for sub in self.subgroups.values():
             sub["condition"] = self.D.p + " AND " + sub["condition"]
 
-        self.valid_subgroups = [x for x in self.subgroups.keys()]
-        logger.debug("Subgroups: {}", len(self.valid_subgroups))
+        # self.valid_subgroups = [x for x in self.subgroups.keys()]
+        # logger.debug("Subgroups: {}", len(self.valid_subgroups))
         self.online_time = round(time() - start, 2)

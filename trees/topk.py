@@ -12,53 +12,37 @@ from trees.causal_tree import CT, CTP
 
 
 class TopK:
-    def __init__(self, alg: CT | CTP):
-
-        if alg is not None:
-            self.n_subgroups = len(alg.subgroups)
-            self.valid_subs = alg.valid_subgroups[:]
-            self.n_valid = len(self.valid_subs)
-            self.alg = alg
+    def __init__(self, ct: CT | CTP):
+        if ct is not None:
+            self.n_subgroups = len(ct.subgroups)
+            self.ct = ct
 
             self.max_t = 0
-            self.D = alg.D
+            self.D = ct.D
             self.name = type(self).__name__
 
+            self.valid_parents = set()
             self.op_matrix = np.ones((self.n_subgroups + 1, self.n_subgroups + 1)) * -1
 
     def scan(self):
         pass
 
-    def get_topK(self, k=params.TOPK.K):
+    def get_topK(self, k=params.TOPK.K, min_rows=params.TOPK.N_MIN_ROWS):
         self.k = k
+        self.min_rows = min_rows
 
         if self.D.p is None:
             raise ValueError("no P given")
 
         start = time()
 
-        if self.n_valid == 0:
-            logger.warning(f"{self.alg.algorithm} - No valid subgroups - skipping topK")
-            return pd.DataFrame([])
-        elif self.n_valid <= k:
-            logger.warning(
-                f"{self.alg.algorithm} - Valid subgroups ({self.n_valid}) less than K ({k}) - skipping topK"
-            )
-            recs = self.valid_subs
-        else:  # sort using topK method
-            recs = self.scan()  # ids
+        recs = self.scan()  # ids
 
-        scan_time = round(time() - start, 3)
+        execution_time = round(time() - start, 3)
 
-        if len(recs) == 0:
+        if len(recs) < self.k:
             logger.warning(
-                f"{self.alg.algorithm} with {self.name} - could not find any valid subgroups"
-            )
-            return pd.DataFrame([])
-
-        elif len(recs) < self.k and self.n_valid > self.k:
-            logger.warning(
-                f"{self.alg.algorithm} with {self.name} - could not find {self.k} subgroups out of {self.n_valid} valid subgroups"
+                f"{self.ct.algorithm} with {self.name} - could not yield K={self.k} subgroups"
             )
             return pd.DataFrame([])
 
@@ -71,10 +55,10 @@ class TopK:
                     "t": self.D.CATE(s["condition"]),
                     "t_r": self.D.CATE(r),
                     "topK_algorithm": self.name,
-                    "variant": self.alg.algorithm + " " + self.name,
-                    "topK_execution_time": scan_time,
-                    "online_execution_time": self.alg.online_time,
-                    "total_execution_time": scan_time + self.alg.online_time,
+                    "variant": self.ct.algorithm + " " + self.name,
+                    "topK_execution_time": execution_time,
+                    "ct_execution_time": self.ct.online_time,
+                    "total_execution_time": execution_time + self.ct.online_time,
                     "total_subgroups": self.n_subgroups,
                     "rows": self.D.n_rows(r),
                     "overlap": self.compute_overlap_for_sub(
@@ -87,14 +71,13 @@ class TopK:
             t_r_error = abs(s["t_r"] - s["t"])
             if t_r_error > 0.15:
                 logger.warning(
-                    f"{self.alg.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
+                    f"{self.ct.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
                 )
 
             s.update(
                 {
                     "t_error": abs(s["t"] - s["t_est"]),
                     "t_r_error": t_r_error,
-                    "valid_subgroups": self.n_valid,
                 }
             )
 
@@ -103,6 +86,28 @@ class TopK:
     def get_score(self, top_subs: list[int], id: int):  # ID should be in top_subs
         overlap = self.compute_overlap_for_sub(top_subs, id, sub_in_subs=True)
         return self.w * self.get_t(id) / self.max_t + (1 - self.w) * (1 - overlap)
+
+    def is_valid(self, id: int):
+        if self.ct.is_online:
+            return True
+
+        if not self.D.pp.includes(
+            self.get_sub(id)["combined"]
+        ):  # check if subgroup is a subset of P
+            return False
+
+        # TODO probably all parents are invalid too
+
+        if id in self.valid_parents:
+            return True
+
+        r = f"{self.D.p} AND {self.get_sub(id)['condition']}"
+        df = self.D.execute(r)
+        if df.shape[0] > self.min_rows:
+            self.valid_parents.update(self.get_sub(id)["parents"])
+            return True
+
+        return False
 
     def get_worst_overlap(self, subs: list[int]):
         worst_overlap = 0
@@ -147,40 +152,14 @@ class TopK:
         total_score /= self.k
         return total_score, min_score, min_score_idx
 
-    # def estimate_overlap_matrix(self, subs: list[int]):
-    #     self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
-
-    #     for id in subs:
-    #         sub = self.get_sub(id)
-    #         for id2 in sub["parents"]:
-    #             overlap = self.D.estimate_jaccard(
-    #                 sub["combined"], self.get_sub(id2)["combined"]
-    #             )
-
-    #             self.op_matrix[id][id2] = overlap
-    #             self.op_matrix[id2][id] = overlap
-
-    # def compute_overlap_matrix(self, subs: list[int]):
-    #     self.op_matrix = np.zeros((self.n_subgroups + 1, self.n_subgroups + 1))
-
-    #     for id in subs:
-    #         sub = self.get_sub(id)
-    #         for id2 in sub["parents"]:
-    #             overlap = self.D.jaccard_over_preds(
-    #                 sub["condition"], self.get_sub(id2)["condition"]
-    #             )
-
-    #             self.op_matrix[id][id2] = overlap
-    #             self.op_matrix[id2][id] = overlap
-
     def get_sub(self, id: int):
-        return self.alg.subgroups[id]
+        return self.ct.subgroups[id]
 
     def copy_sub(self, id: int):
-        return deepcopy(self.alg.subgroups[id])
+        return deepcopy(self.ct.subgroups[id])
 
     def get_t(self, id: int):
-        return self.alg.subgroups[id]["t_est"]
+        return self.ct.subgroups[id]["t_est"]
 
     # def get_J(self, id1: int, id2: int):
     #     return self.op_matrix[id1][id2]
@@ -202,37 +181,41 @@ class TopK:
         return 0
 
 
-class ConstrainedJ(TopK):
+class OptRes(TopK):
     def __init__(
         self,
-        alg: CT,
+        alg: CT | CTP,
         max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
     ):
         super().__init__(alg)
         self.max_overlap = max_overlap
 
     def scan(self):
-        # self.compute_overlap_matrix(self.alg.valid_subgroups)
+        subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
 
-        subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
+        while self.is_valid(subs[0]) == False:
+            subs.pop(0)
+            if len(subs) == 0:
+                logger.warning(
+                    f"{self.ct.algorithm} - OptRes -  No subgroups satisfy min_rows={self.min_rows}"
+                )
+                return []
+
         self.max_t = self.get_t(subs[0])
-
         recs = [subs[0]]
 
         for sub in subs[1:]:
-            # print("Checking sub", sub)
+            logger.debug(f"Checking sub {sub}")
+            if not self.is_valid(sub):
+                logger.debug(f"Sub {sub} is not valid")
+                continue
+
             accepted = True
             for selected in recs:
                 if self.get_J(selected, sub) > self.max_overlap:
-                    # print(
-                    #     "overlap of sub",
-                    #     i,
-                    #     "with selected",
-                    #     j,
-                    #     self.op_matrix[selected["id"]][sub["id"]],
-                    #     ">",
-                    #     self.max_overlap,
-                    # )
+                    logger.debug(
+                        f"Overlap of candidate {sub} with selected {selected} is {round(self.get_J(selected, sub),2)} > {self.max_overlap}"
+                    )
                     accepted = False
                     break
 
@@ -243,7 +226,7 @@ class ConstrainedJ(TopK):
 
         if len(recs) < self.k:
             logger.warning(
-                f"{self.alg.algorithm} - ConstrainedJ -  Not enough valid subgroups to satisfy max_overlap={self.max_overlap}"
+                f"{self.ct.algorithm} - OptRes -  Not enough subgroups satisfy max_overlap={self.max_overlap}"
             )
         return recs
 
@@ -288,37 +271,56 @@ class Random(TopK):
         super().__init__(alg)
 
     def scan(self):
-        return np.random.choice(self.valid_subs, self.k, replace=False)
+        subs = list(self.ct.subgroups.keys())
+        recs = []
+        while (len(recs) < self.k) and (len(subs) > 0):
+            sub = subs.pop(np.random.randint(0, len(subs)))
+            if self.is_valid(sub):
+                recs.append(sub)
+
+        return recs
 
 
-class Weighted(TopK):
+class ResOve(TopK):
     def __init__(self, alg: CT, w=params.TOPK.W):
         super().__init__(alg)
         self.w = w
 
     def scan(self):
-        # self.compute_overlap_matrix(self.alg.valid_subgroups)
+        # subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
+        subs = list(self.ct.subgroups.keys())[::-1]
 
-        subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
-        self.max_t = self.get_t(subs[0])
+        recs = []
+        while len(recs) != self.k:
+            if self.is_valid(subs[0]):
+                recs.append(subs[0])
+                subs.pop(0)
+            else:
+                subs.pop(0)
+                if len(subs) == 0:
+                    logger.warning(
+                        f"{self.ct.algorithm} - ResOve -  Not enough subgroups satisfy min_rows={self.min_rows}"
+                    )
+                    return []
 
-        recs = subs[: self.k]
-
+        self.max_t = self.get_t(recs[0])
         _, min_score, min_score_idx = self.get_scores_for_subs(recs)
 
-        for sub in subs[self.k + 1 :]:
-            removed_sub = recs.pop(min_score_idx)
-            recs.append(sub)
+        for sub in subs:
+            logger.debug(f"Checking sub {sub}")
+            if self.is_valid(sub):
+                removed_sub = recs.pop(min_score_idx)
+                recs.append(sub)
 
-            _, new_score, _ = self.get_scores_for_subs(recs)
+                _, new_score, _ = self.get_scores_for_subs(recs)
 
-            if new_score < min_score:
-                # print("Reverting", new_score, "with", min_score)
-                recs.pop(-1)
-                recs.append(removed_sub)
-            else:
-                _, min_score, min_score_idx = self.get_scores_for_subs(recs)
-                # print("New min score", min_score)
+                if new_score < min_score:
+                    logger.debug(f"Reverting {new_score} with {min_score}")
+                    recs.pop(-1)
+                    recs.append(removed_sub)
+                else:
+                    _, min_score, min_score_idx = self.get_scores_for_subs(recs)
+                    logger.debug(f"New min score {min_score}")
 
         return recs
 
@@ -414,31 +416,43 @@ class Weighted(TopK):
 #                 return
 
 
-class LevelBased(TopK):
+class NoOve(TopK):
     def __init__(self, alg: CT):
         super().__init__(alg)
 
     def scan(self):
         levels = {}
 
-        for id in self.valid_subs:
-            sub = self.get_sub(id)
+        for id, sub in self.ct.subgroups.items():
             if sub["depth"] not in levels:
                 levels[sub["depth"]] = []
-            levels[sub["depth"]].append(sub)
+            levels[sub["depth"]].append(id)
 
         best_cate = 0
         best_ids = []
-        for level in levels:
-            if len(levels[level]) >= self.k:
-                levels[level] = sorted(
-                    levels[level], key=lambda x: x["t_est"], reverse=True
+        for level in dict(sorted(levels.items(), reverse=True)):
+            lvlsubgroups = levels[level]
+            if len(lvlsubgroups) >= self.k:
+                lvlsubgroups = sorted(
+                    lvlsubgroups, key=lambda x: self.get_t(x), reverse=True
                 )
-                cate = sum([c["t_est"] for c in levels[level][0 : self.k]])
-                # print("Level", level, "AVG(CATE):", round(cate / self.k, 2))
+                cate = 0
+                valid = 0
+                valid_ids = []
+                for sub in lvlsubgroups:
+                    if self.is_valid(sub):
+                        cate += self.get_t(sub)
+                        valid += 1
+                        valid_ids.append(sub)
+                        if valid == self.k:
+                            break
+
+                if valid < self.k:
+                    continue
+                logger.debug(f"Level {level} AVG(CATE): {round(cate / self.k, 2)}")
                 if cate > best_cate:
                     best_cate = cate
-                    best_ids = [c["id"] for c in levels[level][0 : self.k]]
+                    best_ids = valid_ids[:]
 
         return best_ids
 
@@ -469,6 +483,7 @@ class LastLevel(TopK):
         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-main_competitors = [ConstrainedJ, Weighted, ConstrainedT, LevelBased, Random]
+main_no_random = [OptRes, ResOve, NoOve]
+main_competitors = main_no_random + [Random]
 # exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
 all = main_competitors + [LastLevel]

@@ -131,54 +131,54 @@ class Data:
         intersection = df1.join(df2, how="inner", on="id").shape[0]
         return intersection / min(df1.shape[0], df2.shape[0])
 
-    def get_valid_subgroups(self, subgroups: dict, min_rows=DATA.N_MIN_ROWS):
-        """
-        Get valid subgroups based on the provided Predicate.
+    # def get_valid_subgroups(self, subgroups: dict, min_rows=DATA.N_MIN_ROWS):
+    #     """
+    #     Get valid subgroups based on the provided Predicate.
 
-        Args:
-            P (str): The user's predicate in string format (WHERE only).
-            subgroups (dict): The subgroups to evaluate.
-        """
-        if self.p is None:
-            raise ValueError("no P given")
+    #     Args:
+    #         P (str): The user's predicate in string format (WHERE only).
+    #         subgroups (dict): The subgroups to evaluate.
+    #     """
+    #     if self.p is None:
+    #         raise ValueError("no P given")
 
-        start = time()
-        # n_subgroups = len(subgroups)
+    #     start = time()
+    #     # n_subgroups = len(subgroups)
 
-        valid_subgroups = []
-        pruned_min_rows = 0
-        pruned_not_subsets = 0
-        valid_parents = set()
-        for id, sub in reversed(subgroups.items()):
-            if self.pp.includes(sub["combined"]):
-                if id not in valid_parents:
-                    r = f"{self.p} AND {sub['condition']}"
-                    df = self.execute(r)
-                    if df.shape[0] > min_rows:
-                        valid_subgroups.append(id)
-                        valid_parents.update(sub["parents"])
-                    else:
-                        pruned_min_rows += 1
-                        # print(opt["combined"], "not subset")
-                else:
-                    valid_subgroups.append(id)
-            else:
-                pruned_not_subsets += 1
+    #     valid_subgroups = []
+    #     pruned_min_rows = 0
+    #     pruned_not_subsets = 0
+    #     valid_parents = set()
+    #     for id, sub in reversed(subgroups.items()):
+    #         if self.pp.includes(sub["combined"]):
+    #             if id not in valid_parents:
+    #                 r = f"{self.p} AND {sub['condition']}"
+    #                 df = self.execute(r)
+    #                 if df.shape[0] > min_rows:
+    #                     valid_subgroups.append(id)
+    #                     valid_parents.update(sub["parents"])
+    #                 else:
+    #                     pruned_min_rows += 1
+    #                     # print(opt["combined"], "not subset")
+    #             else:
+    #                 valid_subgroups.append(id)
+    #         else:
+    #             pruned_not_subsets += 1
 
-        end = time()
-        # for accepted in accepted_subgroups:
-        #     accepted["validate_time"] = round(end - start, 2)
-        #     accepted["pruned_min_rows"] = pruned_min_rows
-        #     accepted["pruned_not_subsets"] = pruned_not_subsets
+    #     end = time()
+    #     # for accepted in accepted_subgroups:
+    #     #     accepted["validate_time"] = round(end - start, 2)
+    #     #     accepted["pruned_min_rows"] = pruned_min_rows
+    #     #     accepted["pruned_not_subsets"] = pruned_not_subsets
 
-        logger.debug(
-            f"Total subgroups: {len(subgroups)}, Valid subgroups: {len(valid_subgroups)}"
-        )
-        logger.debug(f"Filtered due to min rows: {pruned_min_rows}")
-        logger.debug(f"Filtered due to not being subsets: {pruned_not_subsets}")
-        logger.debug(f"Filtering Time: {round(end - start, 2)}")
+    #     logger.debug(
+    #         f"Total subgroups: {len(subgroups)}, Valid subgroups: {len(valid_subgroups)}"
+    #     )
+    #     logger.debug(f"Filtered due to min rows: {pruned_min_rows}")
+    #     logger.debug(f"Filtered due to not being subsets: {pruned_not_subsets}")
+    #     logger.debug(f"Filtering Time: {round(end - start, 2)}")
 
-        return valid_subgroups
+    #     return valid_subgroups
 
     def intersection_range(self, interval1: tuple, interval2: tuple):
         start = max(interval1[0], interval2[0])
