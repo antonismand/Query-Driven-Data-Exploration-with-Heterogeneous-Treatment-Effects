@@ -19,7 +19,7 @@ class Data:
         sigma=DATA.SIGMA,
         seed=DATA.SEED,
         mode=DATA.MODE,
-        override_p_with_2=False,
+        # override_p_with_2=False,
     ):
         np.random.seed(seed)
 
