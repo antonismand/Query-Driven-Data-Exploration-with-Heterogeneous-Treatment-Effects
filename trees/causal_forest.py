@@ -91,7 +91,7 @@ class CF:
 
         if parent_id is not None:
             # cond = "<=" if left else ">"
-            num = round(tree.threshold[parent_id], 3)
+            num = round(tree.threshold[parent_id], 5)
             feature = "feature_" + str(tree.feature[parent_id])
             if left:
                 cond = "<="
@@ -107,7 +107,7 @@ class CF:
             else:
                 combined[feature] = interval
 
-            full_condition = f"{feature} {cond} {num}"
+            full_condition = f"{feature} {cond} {num:.5f}"
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
@@ -227,9 +227,6 @@ class CFT(CF):
 
     def online(self):
         self.online_time = 0
-        # start = time()
-        # self.valid_subgroups = self.D.get_valid_subgroups(self.subgroups)
-        # self.online_time = round(time() - start, 2)
 
 
 def parameter_tuning(

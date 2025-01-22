@@ -58,9 +58,8 @@ class Data:
 
         return df.describe()
 
-    def execute(self, condition: str, on="D"):
-        population = self.df if on == "D" else self.q_df
-        ctx = pl.SQLContext(population=population, eager=True)
+    def execute(self, condition: str):
+        ctx = pl.SQLContext(population=self.df, eager=True)
         return ctx.execute("select * from population where " + condition)
 
     def CATE(self, condition: str):
@@ -74,7 +73,7 @@ class Data:
 
     def user_condition(self, p: str):
         self.p = p
-        self.q_df = self.execute(p, on="D")
+        self.q_df = self.execute(p)
         self.pp = Predicate(p, self)
 
     def n_rows(self, condition: str):

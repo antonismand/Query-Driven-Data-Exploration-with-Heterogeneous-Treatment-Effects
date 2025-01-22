@@ -246,9 +246,9 @@ class LoadExperiment(Experiment):
 def plots(x, hue="algorithm", scores=[], rotation=30):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="t", hue=hue, data=scores, ax=axs[0])
+    sns.barplot(x=x, y="t_r", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"True CATE (higher is better)")
-    axs[0].set_ylabel(r"$\tau(S_i)$")
+    axs[0].set_ylabel(r"$\tau(R_i)$")
     axs[0].tick_params(axis="x", labelrotation=rotation)
     axs[0].legend(fontsize="x-small")
 
@@ -261,16 +261,33 @@ def plots(x, hue="algorithm", scores=[], rotation=30):
 
     # ----------------- #
 
-    # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    # sns.barplot(x=x, y="true_score", hue=hue, data=scores, ax=axs[0])
-    # axs[0].set_title(f"True score (higher is better)")
-    # axs[0].set_ylabel("True Score")
-    # axs[0].legend(fontsize="x-small")
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    sns.barplot(x=x, y="overlap", hue=hue, data=scores, ax=axs[0])
+    axs[0].set_title(f"Overlap")
+    axs[0].set_ylabel("overlap")
+    axs[0].tick_params(axis="x", labelrotation=rotation)
+    axs[0].legend(fontsize="x-small")
 
-    # sns.barplot(x=x, y="score", hue=hue, data=scores, ax=axs[1])
-    # axs[1].set_title(f"Score")
-    # axs[1].legend([], [], frameon=False)
-    # plt.show()
+    sns.barplot(x=x, y="total_execution_time", hue=hue, data=scores, ax=axs[1])
+    axs[1].set_title(f"Total Online time")
+    axs[1].tick_params(axis="x", labelrotation=rotation)
+    axs[1].set_ylabel("Time (s)")
+    axs[1].legend([], [], frameon=False)
+    plt.show()
+
+    # ----------------- #
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    sns.barplot(x=x, y="depth", hue=hue, data=scores, ax=axs[0])
+    axs[0].set_title(f"Depth")
+    axs[0].tick_params(axis="x", labelrotation=rotation)
+    axs[0].legend(fontsize="x-small")
+
+    sns.barplot(x=x, y="features", hue=hue, data=scores, ax=axs[1])
+    axs[1].set_title(f"Features")
+    axs[1].tick_params(axis="x", labelrotation=rotation)
+    axs[1].legend([], [], frameon=False)
+    plt.show()
 
     # ----------------- #
 
@@ -292,36 +309,6 @@ def plots(x, hue="algorithm", scores=[], rotation=30):
     # ----------------- #
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="overlap", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Overlap")
-    axs[0].set_ylabel("overlap")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].legend(fontsize="x-small")
-
-    sns.barplot(x=x, y="K", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"K")
-    axs[1].set_ylabel("K")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].legend([], [], frameon=False)
-    plt.show()
-
-    # ----------------- #
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="depth", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Depth")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].legend(fontsize="x-small")
-
-    sns.barplot(x=x, y="features", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Features")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].legend([], [], frameon=False)
-    plt.show()
-
-    # ----------------- #
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     sns.barplot(x=x, y="total_subgroups", hue=hue, data=scores, ax=axs[0])
     axs[0].set_title(f"Total subgroups")
     axs[0].tick_params(axis="x", labelrotation=rotation)
@@ -336,56 +323,33 @@ def plots(x, hue="algorithm", scores=[], rotation=30):
     # ----------------- #
 
     # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    # sns.barplot(
-    #     x=x, y="pruned_min_rows", hue=hue, data=scores, ax=axs[0]
-    # )
-    # axs[0].set_title(f"Pruned due to min rows")
+    # sns.barplot(x=x, y="ct_execution_time", hue=hue, data=scores, ax=axs[0])
+    # axs[0].set_title(f"Filtering Time")
+    # axs[0].tick_params(axis="x", labelrotation=rotation)
+    # axs[0].set_ylabel("Time (s)")
     # axs[0].legend(fontsize="x-small")
 
-    # sns.barplot(
-    #     x=x, y="pruned_not_subsets", hue=hue, data=scores, ax=axs[1]
-    # )
-    # axs[1].set_title(f"Pruned due to not being subsets")
-    # axs[1].legend([], [], frameon=False)
-    # plt.show()
 
-    # ----------------- #
+def single_run(cate_model=CTP, topk_method=None, seed=0):
+    D = Data()
+    D.generate(seed=seed)
 
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="ct_execution_time", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Filtering Time")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].set_ylabel("Time (s)")
-    axs[0].legend(fontsize="x-small")
+    alg = cate_model()
+    start = time()
+    alg.fit(D=D)
+    end = round(time() - start, 2)
+    logger.info(f"[{alg.algorithm}] Offline time: {end}")
 
-    sns.barplot(x=x, y="total_execution_time", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Total Online time")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].set_ylabel("Time (s)")
-    axs[1].legend([], [], frameon=False)
-    plt.show()
+    D.generate_random_condition()
 
+    start = time()
+    alg.online()
+    end = round(time() - start, 2)
+    print(f"[{alg.algorithm}] Online time: {end}")
+    start = time()
+    topk = topk_method(alg=alg)
+    top = topk.get_topK()
+    end = round(time() - start, 2)
+    print(f"[{alg.algorithm}] {end}s")
 
-# def single_run(cate_model=CT, scanner=TopK, seed=42):
-#     D = Data()
-#     D.generate()
-
-#     alg = cate_model(scan_method=scanner)
-#     start = time()
-#     alg.fit(D=D, seed=seed)
-#     end = round(time() - start, 2)
-#     print(f"[{alg.algorithm}] Offline time: {end}")
-
-#     D.generate_random_condition()
-
-#     start = time()
-#     alg.online()
-#     end = round(time() - start, 2)
-#     print(f"[{alg.algorithm}] Online time: {end}")
-#     start = time()
-#     scan = scanner(valid_subs=alg.valid_options, op_matrix=alg.op_matrix, D=D)
-#     top = scan.get_topK()
-#     end = round(time() - start, 2)
-#     print(f"[{scan.name}] get topK score: {round(top['score'].mean(),2)} in {end}s")
-
-#     return top
+    return top

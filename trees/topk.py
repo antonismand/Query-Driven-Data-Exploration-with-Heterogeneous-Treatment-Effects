@@ -24,6 +24,9 @@ class TopK:
             self.valid_parents = set()
             self.op_matrix = np.ones((self.n_subgroups + 1, self.n_subgroups + 1)) * -1
 
+            for sub in ct.subgroups.values():
+                sub["final_condition"] = ct.D.p + " AND " + sub["condition"]
+
     def scan(self):
         pass
 
@@ -49,23 +52,21 @@ class TopK:
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
         for s in final_recs:
-            r = f"{self.D.p} AND {s['condition']}"
             s.update(
                 {
                     "t": self.D.CATE(s["condition"]),
-                    "t_r": self.D.CATE(r),
+                    "t_r": self.D.CATE(s["final_condition"]),
                     "topK_algorithm": self.name,
                     "variant": self.ct.algorithm + " " + self.name,
                     "topK_execution_time": execution_time,
                     "ct_execution_time": self.ct.online_time,
                     "total_execution_time": execution_time + self.ct.online_time,
                     "total_subgroups": self.n_subgroups,
-                    "rows": self.D.n_rows(r),
+                    "rows": self.D.n_rows(s["final_condition"]),
                     "overlap": self.compute_overlap_for_sub(
                         recs, s["id"], sub_in_subs=True
                     ),
                     "K": len(recs),
-                    # "score": self.get_score(recs, s["id"]),
                 }
             )
             t_r_error = abs(s["t_r"] - s["t"])
@@ -101,7 +102,7 @@ class TopK:
         if id in self.valid_parents:
             return True
 
-        r = f"{self.D.p} AND {self.get_sub(id)['condition']}"
+        r = self.get_sub(id)["final_condition"]
         df = self.D.execute(r)
         if df.shape[0] > self.min_rows:
             self.valid_parents.update(self.get_sub(id)["parents"])
@@ -172,7 +173,9 @@ class TopK:
         sub2 = self.get_sub(id2)
 
         if id1 in sub2["parents"] or id2 in sub1["parents"]:
-            overlap = self.D.jaccard_over_preds(sub1["condition"], sub2["condition"])
+            overlap = self.D.jaccard_over_preds(
+                sub1["final_condition"], sub2["final_condition"]
+            )
             self.op_matrix[id1][id2] = overlap
             self.op_matrix[id2][id1] = overlap
             return overlap
@@ -205,15 +208,15 @@ class OptRes(TopK):
         recs = [subs[0]]
 
         for sub in subs[1:]:
-            logger.debug(f"Checking sub {sub}")
+            logger.trace(f"Checking sub {sub}")
             if not self.is_valid(sub):
-                logger.debug(f"Sub {sub} is not valid")
+                logger.trace(f"Sub {sub} is not valid")
                 continue
 
             accepted = True
             for selected in recs:
                 if self.get_J(selected, sub) > self.max_overlap:
-                    logger.debug(
+                    logger.trace(
                         f"Overlap of candidate {sub} with selected {selected} is {round(self.get_J(selected, sub),2)} > {self.max_overlap}"
                     )
                     accepted = False
@@ -307,7 +310,7 @@ class ResOve(TopK):
         _, min_score, min_score_idx = self.get_scores_for_subs(recs)
 
         for sub in subs:
-            logger.debug(f"Checking sub {sub}")
+            logger.trace(f"Checking sub {sub}")
             if self.is_valid(sub):
                 removed_sub = recs.pop(min_score_idx)
                 recs.append(sub)
@@ -315,12 +318,12 @@ class ResOve(TopK):
                 _, new_score, _ = self.get_scores_for_subs(recs)
 
                 if new_score < min_score:
-                    logger.debug(f"Reverting {new_score} with {min_score}")
+                    logger.trace(f"Reverting {new_score} with {min_score}")
                     recs.pop(-1)
                     recs.append(removed_sub)
                 else:
                     _, min_score, min_score_idx = self.get_scores_for_subs(recs)
-                    logger.debug(f"New min score {min_score}")
+                    logger.trace(f"New min score {min_score}")
 
         return recs
 

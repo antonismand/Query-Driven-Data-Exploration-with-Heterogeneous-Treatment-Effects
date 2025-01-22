@@ -88,7 +88,7 @@ class CT:
         if parent_id is not None:
             # cond = "<=" if left else ">"
             feature = "feature_" + str(self.tree.feature[parent_id])
-            num = round(self.tree.threshold[parent_id], 3)
+            num = round(self.tree.threshold[parent_id], 5)
             if left:
                 cond = "<="
                 interval = (self.D.min_max[feature][0], num)
@@ -103,7 +103,7 @@ class CT:
             else:
                 combined[feature] = interval
 
-            full_condition = f"{feature} {cond} {num}"
+            full_condition = f"{feature} {cond} {num:.5f}"
             if prev_conditions != "":
                 full_condition = f"{prev_conditions} AND {full_condition}"
 
@@ -181,9 +181,5 @@ class CTP(CT):
             min_samples_leaf=self.min_samples_leaf,
             on="P",
         )
-        for sub in self.subgroups.values():
-            sub["condition"] = self.D.p + " AND " + sub["condition"]
 
-        # self.valid_subgroups = [x for x in self.subgroups.keys()]
-        # logger.debug("Subgroups: {}", len(self.valid_subgroups))
         self.online_time = round(time() - start, 2)
