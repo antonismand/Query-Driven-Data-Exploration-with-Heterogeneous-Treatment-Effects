@@ -150,12 +150,12 @@ class Experiment:
 
         return parameters
 
-    def save_tikzplot(self, plots=["t", "overlap"]):
-        if "t" in plots:
+    def save_tikzplot(self, x=None, plots=["cate", "overlap"], hue="algorithm"):
+        if x is None:
+            x = self.var_name
+        if "cate" in plots:
             plt.figure()
-            ax = sns.barplot(
-                x=self.var_name, y="t_r", hue="algorithm", data=self.scores
-            )
+            ax = sns.barplot(x=x, y="t_r", hue=hue, data=self.scores)
             ax.set_title("True CATE (higher is better)")
             ax.set_ylabel(r"$|\tau(R_i)|$")
             ax.tick_params(axis="x", labelrotation=20)
@@ -166,7 +166,7 @@ class Experiment:
 
             # tikzplotlib.clean_figure()
             tikzplotlib.save(
-                f"../tex/{self.var_name}-t.tex",
+                f"../tex/{x}-t.tex",
                 extra_axis_parameters=[
                     "scaled x ticks=false",
                     "scaled y ticks=false",
@@ -181,7 +181,10 @@ class Experiment:
         if "overlap" in plots:
             plt.figure()
             ax = sns.barplot(
-                x=self.var_name, y="overlap", hue="algorithm", data=self.scores
+                x=x,
+                y="overlap",
+                hue=hue,
+                data=self.scores[self.scores["algorithm"] == "[Pretrained] CF"],
             )
             ax.set_title("Overlap (lower is better)")
             ax.set_ylabel("Overlap")
@@ -193,7 +196,7 @@ class Experiment:
 
             # tikzplotlib.clean_figure()
             tikzplotlib.save(
-                f"../tex/{self.var_name}-overlap.tex",
+                f"../tex/{x}-overlap.tex",
                 extra_axis_parameters=[
                     "scaled x ticks=false",
                     "scaled y ticks=false",
@@ -208,12 +211,12 @@ class Experiment:
         if "time" in plots:
             plt.figure()
             ax = sns.barplot(
-                x=self.var_name,
+                x=x,
                 y="total_execution_time",
-                hue="algorithm",
+                hue=hue,
                 data=self.scores,
             )
-            ax.set_title("Total Execution Time")
+            ax.set_title("Online Execution Time")
             ax.set_ylabel("Time (s)")
             ax.tick_params(axis="x", labelrotation=20)
             ax.set_xlabel(r"top-$K$ Algorithm")
@@ -223,7 +226,7 @@ class Experiment:
 
             # tikzplotlib.clean_figure()
             tikzplotlib.save(
-                f"../tex/{self.var_name}-overlap.tex",
+                f"../tex/{x}-overlap.tex",
                 extra_axis_parameters=[
                     "scaled x ticks=false",
                     "scaled y ticks=false",
@@ -269,7 +272,7 @@ def plots(x, hue="algorithm", scores=[], rotation=30):
     axs[0].legend(fontsize="x-small")
 
     sns.barplot(x=x, y="total_execution_time", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Total Online time")
+    axs[1].set_title(f"Online Execution Time")
     axs[1].tick_params(axis="x", labelrotation=rotation)
     axs[1].set_ylabel("Time (s)")
     axs[1].legend([], [], frameon=False)
@@ -353,3 +356,25 @@ def single_run(cate_model=CTP, topk_method=None, seed=0):
     print(f"[{alg.algorithm}] {end}s")
 
     return top
+
+
+def topK_params_experiment(param_name, param_values, user_iterations=20, scanners=[]):
+    scores = pd.DataFrame()
+
+    D = Data()
+    D.generate(seed=42)
+
+    for p in tqdm(param_values):
+        cf = CFT()
+        cf.fit(D=D)
+
+        for _ in range(user_iterations):
+            D.generate_random_condition()
+            cf.online()
+            for scanner in scanners:
+                scan = scanner(alg=cf, **{param_name: p})
+                score = scan.get_topK()
+                score[param_name] = p
+                scores = pd.concat([scores, score], ignore_index=True)
+
+    plots(x=param_name, scores=scores)

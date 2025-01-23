@@ -15,7 +15,7 @@ class CF:
     def __init__(self):
         self.subgroups = {}
         self.is_online = False
-        # self.algorithm = "[Hybrid] CF"
+        self.algorithm = "[Pretrained] CF"
 
     def fit(
         self,

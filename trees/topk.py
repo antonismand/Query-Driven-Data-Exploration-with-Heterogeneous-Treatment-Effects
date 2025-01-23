@@ -234,37 +234,47 @@ class OptRes(TopK):
         return recs
 
 
-class ConstrainedT(TopK):
+class OptOve(TopK):
     def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
         super().__init__(alg)
         self.percentile = percentile
 
     def scan(self):
-        # self.compute_overlap_matrix(self.alg.valid_subgroups)
+        subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
 
-        subs = sorted(self.valid_subs, key=lambda x: self.get_t(x), reverse=True)
+        recs = []
+        while len(recs) != self.k:
+            if self.is_valid(subs[0]):
+                recs.append(subs[0])
+                subs.pop(0)
+            else:
+                subs.pop(0)
+                if len(subs) == 0:
+                    logger.warning(
+                        f"{self.ct.algorithm} - OptOve -  Not enough subgroups satisfy min_rows={self.min_rows}"
+                    )
+                    return []
+
         self.max_t = self.get_t(subs[0])
-
-        percentile_index = int(self.percentile * self.n_valid)
-
-        recs = subs[: self.k]
-
+        percentile_index = int(self.percentile * self.n_subgroups)
         worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
 
         for sub in subs[self.k + 1 : percentile_index]:
-            removed_sub = recs.pop(worst_overlap_idx)
-            recs.append(sub)
+            logger.trace(f"Checking sub {sub}")
+            if self.is_valid(sub):
+                removed_sub = recs.pop(worst_overlap_idx)
+                recs.append(sub)
 
-            new_overlap, _ = self.get_worst_overlap(recs)
+                new_overlap, _ = self.get_worst_overlap(recs)
 
-            if new_overlap > worst_overlap:
-                # print("Reverting", new_worst_overlap, "with", worst_overlap)
-                recs.pop(-1)
-                recs.append(removed_sub)
+                if new_overlap > worst_overlap:
+                    logger.trace("Reverting", new_overlap, "with", worst_overlap)
+                    recs.pop(-1)
+                    recs.append(removed_sub)
 
-            else:
-                worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
-                # print("New worst overlap", worst_overlap)
+                else:
+                    worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
+                    logger.trace("New worst overlap", worst_overlap)
 
         return recs
 
@@ -460,33 +470,32 @@ class NoOve(TopK):
         return best_ids
 
 
-class LastLevel(TopK):
-    def __init__(self, alg: CT):
-        super().__init__(alg)
+# class LastLevel(TopK):
+#     def __init__(self, alg: CT):
+#         super().__init__(alg)
 
-    def scan(self):
-        levels = {}
-        level = 0
+#     def scan(self):
+#         levels = {}
+#         level = 0
 
-        for id in self.valid_subs:
-            sub = self.get_sub(id)
-            if sub["depth"] not in levels:
-                levels[sub["depth"]] = []
-                level = max(level, sub["depth"])
-            levels[sub["depth"]].append(sub)
+#         for id in self.valid_subs:
+#             sub = self.get_sub(id)
+#             if sub["depth"] not in levels:
+#                 levels[sub["depth"]] = []
+#                 level = max(level, sub["depth"])
+#             levels[sub["depth"]].append(sub)
 
-        level_keys = sorted(levels.keys())
+#         level_keys = sorted(levels.keys())
 
-        while len(levels[level]) < self.k and len(level_keys) > 0:
-            level = level_keys.pop()
-            # print("Trying level", level)
+#         while len(levels[level]) < self.k and len(level_keys) > 0:
+#             level = level_keys.pop()
+#             # print("Trying level", level)
 
-        levels[level] = sorted(levels[level], key=lambda x: x["t_est"], reverse=True)
+#         levels[level] = sorted(levels[level], key=lambda x: x["t_est"], reverse=True)
 
-        return [c["id"] for c in levels[level][0 : self.k]]
+#         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-main_no_random = [OptRes, ResOve, NoOve]
+main_no_random = [OptRes, ResOve, NoOve, OptOve]
 main_competitors = main_no_random + [Random]
 # exhaustive = [ExhaustiveWeighted, ExhaustiveT, ExhaustiveOverlap]
-all = main_competitors + [LastLevel]
