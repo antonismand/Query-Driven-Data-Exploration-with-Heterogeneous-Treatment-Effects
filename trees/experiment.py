@@ -219,7 +219,7 @@ class Experiment:
             ax.set_title("Online Execution Time")
             ax.set_ylabel("Time (s)")
             ax.tick_params(axis="x", labelrotation=20)
-            ax.set_xlabel(r"top-$K$ Algorithm")
+            ax.set_xlabel(x)
             ax.legend(fontsize="x-small")
 
             plt.draw()
@@ -378,3 +378,27 @@ def topK_params_experiment(param_name, param_values, user_iterations=20, scanner
                 scores = pd.concat([scores, score], ignore_index=True)
 
     plots(x=param_name, scores=scores)
+
+
+def subgroup_size_experiment(
+    subgroup_sizes=[], user_iterations=20, topk_methods=main_competitors
+):
+    scores = pd.DataFrame()
+
+    D = Data()
+    D.generate(seed=42)
+
+    cf = CFT()
+    cf.fit(D=D)
+    for subgroup_size in subgroup_sizes:
+
+        for _ in range(user_iterations):
+            D.generate_random_condition()
+            cf.online()
+            for scanner in topk_methods:
+                scan = scanner(alg=cf)
+                score = scan.get_topK()
+                score["subgroup_size"] = subgroup_size
+                scores = pd.concat([scores, score], ignore_index=True)
+
+    plots(x="subgroup_size", scores=scores)

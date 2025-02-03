@@ -230,7 +230,12 @@ class CFT(CF):
 
 
 def parameter_tuning(
-    param_name, param_values, n_rows=params.DATA.N_ROWS, user_iterations=50, scanners=[]
+    param_name,
+    param_values,
+    n_rows=params.DATA.N_ROWS,
+    user_iterations=50,
+    scanners=[],
+    hue=None,
 ):
     from trees.experiment import plots
 
@@ -253,4 +258,4 @@ def parameter_tuning(
                 score[param_name] = p
                 scores = pd.concat([scores, score], ignore_index=True)
 
-    plots(x=param_name, scores=scores)
+    plots(x=param_name, scores=scores, hue=hue)
