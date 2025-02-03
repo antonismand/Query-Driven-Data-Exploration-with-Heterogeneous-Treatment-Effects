@@ -1,4 +1,3 @@
-from time import time
 from econml.dml import CausalForestDML
 from loguru import logger
 import pandas as pd
@@ -20,7 +19,6 @@ class CF:
     def fit(
         self,
         D: Data,
-        parse_depth=100,
         criterion=params.CF.CRITERION,
         n_estimators=params.CF.N_ESTIMATORS,
         tune=False,
@@ -33,7 +31,6 @@ class CF:
     ):
         self.D = D
         self.df = D.df
-        self.parse_depth = parse_depth
         self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
@@ -125,7 +122,7 @@ class CF:
                 "parents": parents[:],
             }
 
-        if tree.children_left[node_id] != -1 and depth < self.parse_depth:
+        if tree.children_left[node_id] != -1:
             self.parse_tree(
                 tree=tree,
                 node_id=tree.children_left[node_id],
@@ -165,7 +162,6 @@ class CFT(CF):
     def fit(
         self,
         D: Data,
-        parse_depth=100,
         criterion=params.CF.CRITERION,
         n_estimators=params.CF.N_ESTIMATORS,
         tune=False,
@@ -174,12 +170,11 @@ class CFT(CF):
         min_samples_split=params.CF.MIN_SAMPLES_SPLIT,
         min_samples_leaf=params.CF.MIN_SAMPLES_LEAF,
         max_features=params.CF.MAX_FEATURES,
-        train_in_all_features=True,
+        train_in_all_features=params.CF.TRAIN_IN_ALL_FEATURES,
         print_tree=False,
     ):
         self.df = D.df
         self.D = D
-        self.parse_depth = parse_depth
         forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
@@ -227,35 +222,3 @@ class CFT(CF):
 
     def online(self):
         self.online_time = 0
-
-
-def parameter_tuning(
-    param_name,
-    param_values,
-    n_rows=params.DATA.N_ROWS,
-    user_iterations=50,
-    scanners=[],
-    hue=None,
-):
-    from trees.experiment import plots
-
-    scores = pd.DataFrame()
-
-    D = Data()
-    D.generate(seed=34, n=n_rows)
-
-    # print(f"{param_name}: {p}")
-    for p in tqdm(param_values):
-        cf = CFT()
-        cf.fit(D=D, **{param_name: p})
-
-        for _ in range(user_iterations):
-            D.generate_random_condition()
-            cf.online()
-            for scanner in scanners:
-                scan = scanner(alg=cf)
-                score = scan.get_topK()
-                score[param_name] = p
-                scores = pd.concat([scores, score], ignore_index=True)
-
-    plots(x=param_name, scores=scores, hue=hue)

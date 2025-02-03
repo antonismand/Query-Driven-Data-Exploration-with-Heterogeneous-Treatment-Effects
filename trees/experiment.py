@@ -31,13 +31,14 @@ class Experiment:
         exp_name: str = None,
         data_iterations=1,
         user_iterations=20,
-        cate_models=[CT, CTP, CFT],
+        cate_models=[CFT],
         topk_methods=main_competitors,
         save_csv=True,
         **kwargs,
     ):
         self.scores = pd.DataFrame()
         self.var_name = var_name
+        self.exp_name = exp_name
 
         data_params = self.get_signature(Data().generate, kwargs)
         data_keys = list(data_params.keys())
@@ -67,10 +68,10 @@ class Experiment:
                         f"\t {ct.algorithm} - Offline time: {timedelta(seconds=(time() - start))}"
                     )
 
-                for j in range(user_iterations):
+                for j in tqdm(range(user_iterations)):
                     for condition_values in product(*condition_params.values()):
                         condition_dict = dict(zip(condition_keys, condition_values))
-                        logger.info(
+                        logger.debug(
                             "\t\t Generating P {}/{}: {}",
                             j + 1,
                             user_iterations,
@@ -83,7 +84,7 @@ class Experiment:
                             # logger.info(f"{ct.algorithm} running")
                             start = time()
                             ct.online()
-                            logger.info(
+                            logger.debug(
                                 f"\t\t\t {ct.algorithm} - Online time: {timedelta(seconds=(time() - start))}"
                             )
 
@@ -94,7 +95,7 @@ class Experiment:
                                     start = time()
                                     topk = topk_method(alg=ct)
                                     score = topk.get_topK(**topK_dict)
-                                    logger.info(
+                                    logger.debug(
                                         f"\t\t\t\t {topk.name}: {timedelta(seconds=(time() - start))} - {str(topK_dict)}"
                                     )
 
@@ -134,11 +135,6 @@ class Experiment:
                 exp_name = var_name
             self.scores.to_csv(f"../csv/{exp_name}.csv", index=False)
 
-    def plot(self, x=None, hue="algorithm", rotation=30):
-        if x is None:
-            x = self.var_name
-        plots(x=x, hue=hue, scores=self.scores, rotation=rotation)
-
     def get_signature(self, func, kwargs):
         signature = inspect.signature(func)
         parameters = {}
@@ -150,36 +146,19 @@ class Experiment:
 
         return parameters
 
-    def save_tikzplot(self, x=None, plots=["cate", "overlap"], hue="algorithm"):
+    def save_tikzplot(self, x=None, plot=None, hue="algorithm"):
         if x is None:
             x = self.var_name
-        if "cate" in plots:
-            plt.figure()
+
+        # plt.figure()
+        if plot == "cate":
             ax = sns.barplot(x=x, y="t_r", hue=hue, data=self.scores)
             ax.set_title("True CATE (higher is better)")
             ax.set_ylabel(r"$|\tau(R_i)|$")
             ax.tick_params(axis="x", labelrotation=20)
             ax.set_xlabel(r"top-$K$ Algorithm")
 
-            ax.legend(fontsize="x-small")
-            plt.draw()
-
-            # tikzplotlib.clean_figure()
-            tikzplotlib.save(
-                f"../tex/{x}-t.tex",
-                extra_axis_parameters=[
-                    "scaled x ticks=false",
-                    "scaled y ticks=false",
-                    "yticklabel style={/pgf/number format/precision=3}",
-                    "xticklabel style={font=\small}",
-                    "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
-                ],
-                axis_height="\\figH",
-                axis_width="\\figW",
-            )
-
-        if "overlap" in plots:
-            plt.figure()
+        elif plot == "overlap":
             ax = sns.barplot(
                 x=x,
                 y="overlap",
@@ -190,147 +169,210 @@ class Experiment:
             ax.set_ylabel("Overlap")
             ax.tick_params(axis="x", labelrotation=20)
             ax.set_xlabel(r"top-$K$ Algorithm")
-            ax.legend(fontsize="x-small")
 
-            plt.draw()
-
-            # tikzplotlib.clean_figure()
-            tikzplotlib.save(
-                f"../tex/{x}-overlap.tex",
-                extra_axis_parameters=[
-                    "scaled x ticks=false",
-                    "scaled y ticks=false",
-                    "yticklabel style={/pgf/number format/precision=4}",
-                    "xticklabel style={font=\small}",
-                    "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
-                ],
-                axis_height="\\figH",
-                axis_width="\\figW",
-            )
-
-        if "time" in plots:
-            plt.figure()
-            ax = sns.barplot(
-                x=x,
-                y="total_execution_time",
-                hue=hue,
-                data=self.scores,
-            )
+        elif plot == "time":
+            ax = sns.barplot(x=x, y="total_execution_time", hue=hue, data=self.scores)
             ax.set_title("Online Execution Time")
             ax.set_ylabel("Time (s)")
             ax.tick_params(axis="x", labelrotation=20)
             ax.set_xlabel(x)
-            ax.legend(fontsize="x-small")
 
-            plt.draw()
+        elif plot == "subgroups":
+            ax = sns.barplot(x=x, y="total_subgroups", hue=hue, data=self.scores)
+            ax.set_title("Total subgroups")
+            ax.set_ylabel("Subgroups")
+            ax.tick_params(axis="x", labelrotation=20)
+            ax.set_xlabel(x)
 
-            # tikzplotlib.clean_figure()
-            tikzplotlib.save(
-                f"../tex/{x}-overlap.tex",
-                extra_axis_parameters=[
-                    "scaled x ticks=false",
-                    "scaled y ticks=false",
-                    "yticklabel style={/pgf/number format/precision=4}",
-                    "xticklabel style={font=\small}",
-                    "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
-                ],
-                axis_height="\\figH",
-                axis_width="\\figW",
-            )
+        ax.legend(fontsize="x-small")
+        #
+        # plt.draw()
+
+        # tikzplotlib.clean_figure()
+        tikzplotlib.save(
+            f"../tex/{self.exp_name}-{plot}.tex",
+            extra_axis_parameters=[
+                "scaled x ticks=false",
+                "scaled y ticks=false",
+                "yticklabel style={/pgf/number format/precision=3}",
+                "xticklabel style={font=\small}",
+                "legend style={fill opacity=0.8,draw opacity=1, text opacity=1, draw=white!80!black,font=\scriptsize}",
+            ],
+            axis_height="\\figH",
+            axis_width="\\figW",
+        )
+        plt.show()
+
+    def plots(self, x=None, hue="algorithm", rotation=30):
+
+        if x is None:
+            x = self.var_name
+
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        sns.barplot(x=x, y="t_r", hue=hue, data=self.scores, ax=axs[0])
+        axs[0].set_title(f"True CATE (higher is better)")
+        axs[0].set_ylabel(r"$\tau(R_i)$")
+        axs[0].tick_params(axis="x", labelrotation=rotation)
+        axs[0].legend(fontsize="x-small")
+
+        sns.barplot(x=x, y="t_est", hue=hue, data=self.scores, ax=axs[1])
+        axs[1].set_title(f"Estimated CATE")
+        axs[1].set_ylabel(r"$\hat{\tau}(S_i)$")
+        axs[1].tick_params(axis="x", labelrotation=rotation)
+        axs[1].legend([], [], frameon=False)
+        plt.show()
+
+        # ----------------- #
+
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        sns.barplot(x=x, y="overlap", hue=hue, data=self.scores, ax=axs[0])
+        axs[0].set_title(f"Overlap")
+        axs[0].set_ylabel("overlap")
+        axs[0].tick_params(axis="x", labelrotation=rotation)
+        axs[0].legend(fontsize="x-small")
+
+        sns.barplot(x=x, y="max_overlap", hue=hue, data=self.scores, ax=axs[1])
+        axs[1].set_title(f"Max Overlap")
+        axs[1].set_ylabel("max(overlap)")
+        axs[1].tick_params(axis="x", labelrotation=rotation)
+        axs[1].legend(fontsize="x-small")
+
+        # ----------------- #
+
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        sns.barplot(x=x, y="total_subgroups", hue=hue, data=self.scores, ax=axs[0])
+        axs[0].set_title(f"Total subgroups")
+        axs[0].tick_params(axis="x", labelrotation=rotation)
+        axs[0].legend(fontsize="x-small")
+
+        sns.barplot(x=x, y="total_execution_time", hue=hue, data=self.scores, ax=axs[1])
+        axs[1].set_title(f"Online Execution Time")
+        axs[1].tick_params(axis="x", labelrotation=rotation)
+        axs[1].set_ylabel("Time (s)")
+        axs[1].legend([], [], frameon=False)
+        plt.show()
+
+        # ----------------- #
+
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        sns.barplot(x=x, y="depth", hue=hue, data=self.scores, ax=axs[0])
+        axs[0].set_title(f"Depth")
+        axs[0].tick_params(axis="x", labelrotation=rotation)
+        axs[0].legend(fontsize="x-small")
+
+        sns.barplot(x=x, y="features", hue=hue, data=self.scores, ax=axs[1])
+        axs[1].set_title(f"Features")
+        axs[1].tick_params(axis="x", labelrotation=rotation)
+        axs[1].legend([], [], frameon=False)
+        plt.show()
+
+        # ----------------- #
+
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        sns.barplot(x=x, y="t_error", hue=hue, data=self.scores, ax=axs[0])
+        axs[0].set_title(f"Prediction error")
+        axs[0].set_ylabel(r"$|\tau(S_i) - \hat{\tau}(S_i)|$")
+        axs[0].tick_params(axis="x", labelrotation=rotation)
+
+        axs[0].legend(fontsize="x-small")
+
+        sns.barplot(x=x, y="t_r_error", hue=hue, data=self.scores, ax=axs[1])
+        axs[1].set_title(f"False Estimation")
+        axs[1].set_ylabel(r"$|\tau(R_i) - \tau(S_i)|$")
+        axs[1].tick_params(axis="x", labelrotation=rotation)
+        axs[1].legend([], [], frameon=False)
+        plt.show()
+
+        # ----------------- #
+
+        # sns.barplot(x=x, y="valid_subgroups", hue=hue, data=scores, ax=axs[1])
+        # axs[1].set_title(f"Valid subgroups")
+        # axs[1].tick_params(axis="x", labelrotation=rotation)
+        # axs[1].legend([], [], frameon=False)
+        # plt.show()
+
+        # ----------------- #
+
+        # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        # sns.barplot(x=x, y="ct_execution_time", hue=hue, data=scores, ax=axs[0])
+        # axs[0].set_title(f"Filtering Time")
+        # axs[0].tick_params(axis="x", labelrotation=rotation)
+        # axs[0].set_ylabel("Time (s)")
+        # axs[0].legend(fontsize="x-small")
 
 
 class LoadExperiment(Experiment):
-    def __init__(self, var_name):
-        self.scores = pd.read_csv(f"../csv/{var_name}.csv")
+    def __init__(self, exp_name):
+        self.scores = pd.read_csv(f"../csv/{exp_name}.csv")
+        self.exp_name = exp_name
+
+
+class CFTuning(Experiment):
+    def __init__(
+        self,
+        var_name,
+        var_values,
+        n_rows=params.DATA.N_ROWS,
+        user_iterations=30,
+        topk_methods=main_no_random,
+        save_csv=True,
+    ):
+
+        self.exp_name = "tune_" + var_name
         self.var_name = var_name
-        # plots(x=var_name, scores=self.scores)
+        self.scores = pd.DataFrame()
+
+        D = Data()
+        D.generate(seed=34, n=n_rows)
+
+        for p in tqdm(var_values):
+            cf = CFT()
+            cf.fit(D=D, **{var_name: p})
+
+            for _ in range(user_iterations):
+                D.generate_random_condition()
+                cf.online()
+                for topk_method in topk_methods:
+                    topk = topk_method(alg=cf)
+                    score = topk.get_topK()
+                    score[var_name] = p
+                    self.scores = pd.concat([self.scores, score], ignore_index=True)
+
+        if save_csv:
+            self.scores.to_csv(f"../csv/{self.exp_name}.csv", index=False)
 
 
-def plots(x, hue="algorithm", scores=[], rotation=30):
+class TopKExperiment(Experiment):
+    def __init__(
+        self,
+        var_name,
+        var_values,
+        n_rows=params.DATA.N_ROWS,
+        user_iterations=30,
+        topk_methods=main_no_random,
+    ):
 
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="t_r", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"True CATE (higher is better)")
-    axs[0].set_ylabel(r"$\tau(R_i)$")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].legend(fontsize="x-small")
+        self.exp_name = "topk_param_" + var_name
+        self.var_name = var_name
+        self.scores = pd.DataFrame()
 
-    sns.barplot(x=x, y="t_est", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Estimated CATE")
-    axs[1].set_ylabel(r"$\hat{\tau}(S_i)$")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].legend([], [], frameon=False)
-    plt.show()
+        D = Data()
+        D.generate(seed=34, n=n_rows)
 
-    # ----------------- #
+        for p in tqdm(var_values):
+            cf = CFT()
+            cf.fit(D=D)
 
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="overlap", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Overlap")
-    axs[0].set_ylabel("overlap")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].legend(fontsize="x-small")
+            for _ in range(user_iterations):
+                D.generate_random_condition()
+                cf.online()
+                for topk_method in topk_methods:
+                    topk = topk_method(alg=cf, **{var_name: p})
+                    score = topk.get_topK()
+                    score[var_name] = p
+                    self.scores = pd.concat([self.scores, score], ignore_index=True)
 
-    sns.barplot(x=x, y="total_execution_time", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Online Execution Time")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].set_ylabel("Time (s)")
-    axs[1].legend([], [], frameon=False)
-    plt.show()
-
-    # ----------------- #
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="depth", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Depth")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].legend(fontsize="x-small")
-
-    sns.barplot(x=x, y="features", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"Features")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].legend([], [], frameon=False)
-    plt.show()
-
-    # ----------------- #
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="t_error", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Prediction error")
-    axs[0].set_ylabel(r"$|\tau(S_i) - \hat{\tau}(S_i)|$")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-
-    axs[0].legend(fontsize="x-small")
-
-    sns.barplot(x=x, y="t_r_error", hue=hue, data=scores, ax=axs[1])
-    axs[1].set_title(f"False Estimation")
-    axs[1].set_ylabel(r"$|\tau(R_i) - \tau(S_i)|$")
-    axs[1].tick_params(axis="x", labelrotation=rotation)
-    axs[1].legend([], [], frameon=False)
-    plt.show()
-
-    # ----------------- #
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    sns.barplot(x=x, y="total_subgroups", hue=hue, data=scores, ax=axs[0])
-    axs[0].set_title(f"Total subgroups")
-    axs[0].tick_params(axis="x", labelrotation=rotation)
-    axs[0].legend(fontsize="x-small")
-
-    # sns.barplot(x=x, y="valid_subgroups", hue=hue, data=scores, ax=axs[1])
-    # axs[1].set_title(f"Valid subgroups")
-    # axs[1].tick_params(axis="x", labelrotation=rotation)
-    # axs[1].legend([], [], frameon=False)
-    # plt.show()
-
-    # ----------------- #
-
-    # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    # sns.barplot(x=x, y="ct_execution_time", hue=hue, data=scores, ax=axs[0])
-    # axs[0].set_title(f"Filtering Time")
-    # axs[0].tick_params(axis="x", labelrotation=rotation)
-    # axs[0].set_ylabel("Time (s)")
-    # axs[0].legend(fontsize="x-small")
+        self.scores.to_csv(f"../csv/{self.exp_name}.csv", index=False)
 
 
 def single_run(cate_model=CTP, topk_method=None, seed=0):
@@ -356,49 +398,3 @@ def single_run(cate_model=CTP, topk_method=None, seed=0):
     print(f"[{alg.algorithm}] {end}s")
 
     return top
-
-
-def topK_params_experiment(param_name, param_values, user_iterations=20, scanners=[]):
-    scores = pd.DataFrame()
-
-    D = Data()
-    D.generate(seed=42)
-
-    for p in tqdm(param_values):
-        cf = CFT()
-        cf.fit(D=D)
-
-        for _ in range(user_iterations):
-            D.generate_random_condition()
-            cf.online()
-            for scanner in scanners:
-                scan = scanner(alg=cf, **{param_name: p})
-                score = scan.get_topK()
-                score[param_name] = p
-                scores = pd.concat([scores, score], ignore_index=True)
-
-    plots(x=param_name, scores=scores)
-
-
-def subgroup_size_experiment(
-    subgroup_sizes=[], user_iterations=20, topk_methods=main_competitors
-):
-    scores = pd.DataFrame()
-
-    D = Data()
-    D.generate(seed=42)
-
-    cf = CFT()
-    cf.fit(D=D)
-    for subgroup_size in subgroup_sizes:
-
-        for _ in range(user_iterations):
-            D.generate_random_condition()
-            cf.online()
-            for scanner in topk_methods:
-                scan = scanner(alg=cf)
-                score = scan.get_topK()
-                score["subgroup_size"] = subgroup_size
-                scores = pd.concat([scores, score], ignore_index=True)
-
-    plots(x="subgroup_size", scores=scores)

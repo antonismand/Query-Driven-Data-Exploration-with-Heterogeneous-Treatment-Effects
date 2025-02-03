@@ -51,7 +51,12 @@ class TopK:
 
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
+        max_overlap = 0
+
         for s in final_recs:
+            overlap = self.compute_overlap_for_sub(recs, s["id"], sub_in_subs=True)
+            if overlap > max_overlap:
+                max_overlap = overlap
             s.update(
                 {
                     "t": self.D.CATE(s["condition"]),
@@ -63,9 +68,7 @@ class TopK:
                     "total_execution_time": execution_time + self.ct.online_time,
                     "total_subgroups": self.n_subgroups,
                     "rows": self.D.n_rows(s["final_condition"]),
-                    "overlap": self.compute_overlap_for_sub(
-                        recs, s["id"], sub_in_subs=True
-                    ),
+                    "overlap": overlap,
                     "K": len(recs),
                 }
             )
@@ -81,6 +84,9 @@ class TopK:
                     "t_r_error": t_r_error,
                 }
             )
+
+        for s in final_recs:
+            s["max_overlap"] = max_overlap
 
         return pd.DataFrame(final_recs)
 
@@ -183,6 +189,14 @@ class TopK:
         self.op_matrix[id1][id2] = 0
         return 0
 
+    def check_n_subs(self, subs: list[int]):
+        if len(subs) < self.k:
+            logger.warning(
+                f"{self.ct.algorithm} - {self.name} - Subgroups < K. Returning []"
+            )
+            return False
+        return True
+
 
 class OptRes(TopK):
     def __init__(
@@ -196,15 +210,12 @@ class OptRes(TopK):
     def scan(self):
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
 
-        while self.is_valid(subs[0]) == False:
+        while len(subs) > 0 and self.is_valid(subs[0]) == False:
             subs.pop(0)
-            if len(subs) == 0:
-                logger.warning(
-                    f"{self.ct.algorithm} - OptRes -  No subgroups satisfy min_rows={self.min_rows}"
-                )
-                return []
 
-        self.max_t = self.get_t(subs[0])
+        if not self.check_n_subs(subs):
+            return []
+
         recs = [subs[0]]
 
         for sub in subs[1:]:
@@ -227,10 +238,6 @@ class OptRes(TopK):
                 if len(recs) == self.k:
                     return recs
 
-        if len(recs) < self.k:
-            logger.warning(
-                f"{self.ct.algorithm} - OptRes -  Not enough subgroups satisfy max_overlap={self.max_overlap}"
-            )
         return recs
 
 
@@ -243,19 +250,14 @@ class OptOve(TopK):
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
 
         recs = []
-        while len(recs) != self.k:
+        while len(subs) > 0 and len(recs) != self.k:
             if self.is_valid(subs[0]):
                 recs.append(subs[0])
-                subs.pop(0)
-            else:
-                subs.pop(0)
-                if len(subs) == 0:
-                    logger.warning(
-                        f"{self.ct.algorithm} - OptOve -  Not enough subgroups satisfy min_rows={self.min_rows}"
-                    )
-                    return []
+            subs.pop(0)
 
-        self.max_t = self.get_t(subs[0])
+        if not self.check_n_subs(subs):
+            return []
+
         percentile_index = int(self.percentile * self.n_subgroups)
         worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
 
@@ -266,6 +268,9 @@ class OptOve(TopK):
                 recs.append(sub)
 
                 new_overlap, _ = self.get_worst_overlap(recs)
+
+                if new_overlap == 0:
+                    break
 
                 if new_overlap > worst_overlap:
                     logger.trace("Reverting", new_overlap, "with", worst_overlap)
@@ -304,17 +309,13 @@ class ResOve(TopK):
         subs = list(self.ct.subgroups.keys())[::-1]
 
         recs = []
-        while len(recs) != self.k:
+        while len(subs) > 0 and len(recs) != self.k:
             if self.is_valid(subs[0]):
                 recs.append(subs[0])
-                subs.pop(0)
-            else:
-                subs.pop(0)
-                if len(subs) == 0:
-                    logger.warning(
-                        f"{self.ct.algorithm} - ResOve -  Not enough subgroups satisfy min_rows={self.min_rows}"
-                    )
-                    return []
+            subs.pop(0)
+
+        if not self.check_n_subs(subs):
+            return []
 
         self.max_t = self.get_t(recs[0])
         _, min_score, min_score_idx = self.get_scores_for_subs(recs)
@@ -382,7 +383,6 @@ class ExhaustiveOptRes(TopK):
 
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
         valid_subs = [s for s in subs if self.is_valid(s)]
-        self.max_t = self.get_t(valid_subs[0])
 
         logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
         valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
@@ -413,7 +413,6 @@ class ExhaustiveOptRes(TopK):
 
 #         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
 #         valid_subs = [s for s in subs if self.is_valid(s)]
-#         self.max_t = self.get_t(valid_subs[0])
 
 #         logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
 #         valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
