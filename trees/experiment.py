@@ -30,7 +30,7 @@ class Experiment:
         var_name: str,
         exp_name: str = None,
         data_iterations=1,
-        user_iterations=20,
+        user_iterations=30,
         cate_models=[CFT],
         topk_methods=main_competitors,
         save_csv=True,
