@@ -146,47 +146,59 @@ class Experiment:
 
         return parameters
 
-    def save_tikzplot(self, x=None, plot=None, hue="algorithm"):
+    def save_tikzplot(self, x=None, plot=None, hue="algorithm", rotation=0):
         if x is None:
             x = self.var_name
+        if self.exp_name is None:
+            self.exp_name = self.var_name
 
         # plt.figure()
         if plot == "cate":
             ax = sns.barplot(x=x, y="t_r", hue=hue, data=self.scores)
-            ax.set_title("True CATE (higher is better)")
+            ax.set_title("True CATE")
             ax.set_ylabel(r"$|\tau(R_i)|$")
-            ax.tick_params(axis="x", labelrotation=20)
+            ax.tick_params(axis="x", labelrotation=rotation)
             ax.set_xlabel(r"top-$K$ Algorithm")
 
         elif plot == "overlap":
             ax = sns.barplot(
                 x=x,
-                y="overlap",
+                y="max_overlap",
                 hue=hue,
                 data=self.scores[self.scores["algorithm"] == "[Pretrained] CF"],
             )
-            ax.set_title("Overlap (lower is better)")
+            ax.set_title("Max Overlap")
             ax.set_ylabel("Overlap")
-            ax.tick_params(axis="x", labelrotation=20)
+            ax.tick_params(axis="x", labelrotation=rotation)
             ax.set_xlabel(r"top-$K$ Algorithm")
 
         elif plot == "time":
-            ax = sns.barplot(x=x, y="total_execution_time", hue=hue, data=self.scores)
+            ax = sns.lineplot(
+                x=x, y="total_execution_time", hue=hue, data=self.scores, errorbar=None
+            )
             ax.set_title("Online Execution Time")
             ax.set_ylabel("Time (s)")
-            ax.tick_params(axis="x", labelrotation=20)
+            ax.set_yscale("log")
+            ax.tick_params(axis="x", labelrotation=rotation)
             ax.set_xlabel(x)
+
+            # ax.set_xticks([100000, 500000, 1000000])
+            # ax.set_xticklabels(["100K", "500K", "1M"])
+
+            for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
+                line.set_label(label)
 
         elif plot == "subgroups":
-            ax = sns.barplot(x=x, y="total_subgroups", hue=hue, data=self.scores)
-            ax.set_title("Total subgroups")
-            ax.set_ylabel("Subgroups")
-            ax.tick_params(axis="x", labelrotation=20)
-            ax.set_xlabel(x)
+            ax = sns.barplot(
+                x="max_depth", y="total_execution_time", hue=hue, data=self.scores
+            )
+            ax.set_title("Execution time per subgroup size")
+            ax.set_ylabel("Time (s)")
+            ax.tick_params(axis="x", labelrotation=rotation)
+            ax.set_xlabel("Max depth")
 
         ax.legend(fontsize="x-small")
-        #
-        # plt.draw()
+        plt.draw()
 
         # tikzplotlib.clean_figure()
         tikzplotlib.save(
@@ -203,7 +215,7 @@ class Experiment:
         )
         plt.show()
 
-    def plots(self, x=None, hue="algorithm", rotation=30):
+    def plots(self, x=None, hue="algorithm", rotation=0):
 
         if x is None:
             x = self.var_name

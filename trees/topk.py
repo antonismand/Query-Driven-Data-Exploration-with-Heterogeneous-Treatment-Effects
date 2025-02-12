@@ -24,6 +24,9 @@ class TopK:
             self.valid_parents = set()
             self.op_matrix = np.ones((self.n_subgroups + 1, self.n_subgroups + 1)) * -1
 
+            if list(ct.subgroups.keys())[-1] != self.n_subgroups:
+                raise ValueError("Subgroup size does not match last id")
+
             for sub in ct.subgroups.values():
                 sub["final_condition"] = ct.D.p + " AND " + sub["condition"]
 
@@ -102,8 +105,6 @@ class TopK:
             self.get_sub(id)["combined"]
         ):  # check if subgroup is a subset of P
             return False
-
-        # TODO probably all parents are invalid too
 
         if id in self.valid_parents:
             return True
@@ -295,6 +296,21 @@ class Random(TopK):
             sub = subs.pop(np.random.randint(0, len(subs)))
             if self.is_valid(sub):
                 recs.append(sub)
+
+        return recs
+
+
+class Sort(TopK):
+    def __init__(self, alg: CT):
+        super().__init__(alg)
+
+    def scan(self):
+        subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
+        recs = []
+        while len(subs) > 0 and len(recs) != self.k:
+            if self.is_valid(subs[0]):
+                recs.append(subs[0])
+            subs.pop(0)
 
         return recs
 
@@ -499,6 +515,6 @@ class NoOve(TopK):
 #         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-main_no_random = [OptRes, ResOve, NoOve, OptOve]
+main_no_random = [ResOve, OptRes, NoOve, OptOve]
 main_competitors = main_no_random + [Random]
 exhaustive = [ExhaustiveResOve, ExhaustiveOptRes]

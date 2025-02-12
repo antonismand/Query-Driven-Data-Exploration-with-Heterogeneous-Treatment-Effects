@@ -182,4 +182,7 @@ class CTP(CT):
             on="P",
         )
 
+        if list(self.subgroups.keys())[-1] != len(self.subgroups):
+            raise ValueError("CTP - Subgroup size does not match last id")
+
         self.online_time = round(time() - start, 2)

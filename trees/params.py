@@ -20,7 +20,7 @@ class CT:
 
 
 class CF:
-    CRITERION = "mse"
+    CRITERION = "het"
     N_ESTIMATORS = 64
     MAX_DEPTH = 12
     CV = 2

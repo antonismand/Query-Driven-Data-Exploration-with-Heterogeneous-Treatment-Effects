@@ -37,7 +37,13 @@ class Data:
         self.max_t = df["ITE"].max()
         self.p = None
 
-        self.hte_features = ["feature_0", "feature_1"]  # This should be computed
+        if mode == 1 or mode == 2:
+            self.hte_features = ["feature_0", "feature_1"]
+        elif mode == 4:
+            self.hte_features = ["feature_" + str(i) for i in range(5)]
+        elif mode == 5:
+            self.hte_features = ["feature_" + str(i) for i in range(p)]
+
         self.rest_features = [
             f for f in self.feature_names if f not in self.hte_features
         ]
