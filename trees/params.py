@@ -33,7 +33,7 @@ class CF:
 class TOPK:
     W = 0.7
     K = 5
-    MAX_PAIRWISE_OVERLAP = 0.2
+    MIN_DIVERSITY = 0.2
     PERCENTILE = 0.7
     N_MIN_ROWS = 20
     EXHAUSTIVE_TOPK = 100

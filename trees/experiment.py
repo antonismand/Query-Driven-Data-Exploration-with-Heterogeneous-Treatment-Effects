@@ -237,9 +237,9 @@ class Experiment:
         # ----------------- #
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        sns.barplot(x=x, y="overlap", hue=hue, data=self.scores, ax=axs[0])
-        axs[0].set_title(f"Overlap")
-        axs[0].set_ylabel("overlap")
+        sns.barplot(x=x, y="diversity", hue=hue, data=self.scores, ax=axs[0])
+        axs[0].set_title(f"Diversity")
+        axs[0].set_ylabel("Diversity")
         axs[0].tick_params(axis="x", labelrotation=rotation)
         axs[0].legend(fontsize="x-small")
 
@@ -362,6 +362,7 @@ class TopKExperiment(Experiment):
         n_rows=params.DATA.N_ROWS,
         user_iterations=30,
         topk_methods=main_no_random,
+        save_csv=False,
     ):
 
         self.exp_name = "topk_param_" + var_name
@@ -383,8 +384,8 @@ class TopKExperiment(Experiment):
                     score = topk.get_topK()
                     score[var_name] = p
                     self.scores = pd.concat([self.scores, score], ignore_index=True)
-
-        self.scores.to_csv(f"../csv/{self.exp_name}.csv", index=False)
+        if save_csv:
+            self.scores.to_csv(f"../csv/{self.exp_name}.csv", index=False)
 
 
 def single_run(cate_model=CTP, topk_method=None, seed=0):

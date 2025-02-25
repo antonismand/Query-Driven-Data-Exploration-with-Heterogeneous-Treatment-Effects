@@ -200,6 +200,22 @@ class Data:
         end = min(interval1[1], interval2[1])
         return end - start if start < end else 0
 
+    def interval_distance(self, interval1: tuple, interval2: tuple, full_range):
+        L, U = full_range
+        return (abs(interval1[0] - interval2[0]) + abs(interval1[1] - interval2[1])) / (
+            2 * (U - L)
+        )
+
+    def dissimilarity(self, s1: dict[str, tuple], s2: dict[str, tuple]):
+        total_distance = 0
+        for attr in self.hte_features:
+            interval1 = s1.get(attr, self.min_max[attr])
+            interval2 = s2.get(attr, self.min_max[attr])
+            total_distance += self.interval_distance(
+                interval1, interval2, self.min_max[attr]
+            )
+        return total_distance / len(self.hte_features)
+
     # def jaccard_between_intervals(self, interval1: tuple, interval2: tuple):
     #     intersection = self.intersection(interval1, interval2)
     #     union = interval1[1] - interval1[0] + interval2[1] - interval2[0] - intersection
