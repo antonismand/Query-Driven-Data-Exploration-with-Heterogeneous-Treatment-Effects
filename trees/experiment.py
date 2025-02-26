@@ -173,8 +173,8 @@ class Experiment:
                 ax.set_xticks([100000, 500000, 1000000])
                 ax.set_xticklabels(["100K", "500K", "1M"])
 
-                for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
-                    line.set_label(label)
+            for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
+                line.set_label(label)
 
         ax.tick_params(axis="x", labelrotation=rotation)
         ax.set_xlabel(label_map.get(x, x))
