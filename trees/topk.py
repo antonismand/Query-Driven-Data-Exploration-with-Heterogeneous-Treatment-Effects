@@ -474,7 +474,7 @@ class ExhaustiveOptRes(TopK):
 #         return best_subs
 
 
-class NoOve(TopK):
+class LevelBased(TopK):
     def __init__(self, alg: CT):
         super().__init__(alg)
 
@@ -541,6 +541,6 @@ class NoOve(TopK):
 #         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-main_no_random = [ResDiv, OptRes, NoOve, OptDiv]
+main_no_random = [LevelBased, ResDiv, OptRes, OptDiv]
 main_competitors = main_no_random + [Random]
 exhaustive = [ExhaustiveResOve, ExhaustiveOptRes]

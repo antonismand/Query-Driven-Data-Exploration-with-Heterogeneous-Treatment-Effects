@@ -8,3 +8,5 @@ exports/*
 *old.ipynb
 tex/*
 csv/*
+test.ipynb
+experiments/gitignored/*
