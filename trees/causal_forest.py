@@ -115,10 +115,10 @@ class CF:
                 "id": node_id,
                 "condition": full_condition,
                 "combined": combined,
-                "features": len(combined),
+                "Features": len(combined),
                 "t_est": abs(cate),
-                "depth": depth,
-                "algorithm": self.algorithm,
+                "Depth": depth,
+                "estimator": self.algorithm,
                 "parents": parents[:],
             }
 

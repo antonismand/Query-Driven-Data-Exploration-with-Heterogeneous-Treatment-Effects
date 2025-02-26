@@ -60,42 +60,41 @@ class TopK:
             overlap = self.compute_overlap_for_sub(recs, s["id"], sub_in_subs=True)
             if overlap > max_overlap:
                 max_overlap = overlap
+            t = self.D.CATE(s["condition"])
+            t_r = self.D.CATE(s["final_condition"])
+            t_r_error = abs(t_r - t)
             s.update(
                 {
-                    "t": self.D.CATE(s["condition"]),
-                    "t_r": self.D.CATE(s["final_condition"]),
-                    "topK_algorithm": self.name,
+                    "t": t,
+                    "t_r": t_r,
+                    "Top-K Algorithm": self.name,
                     "variant": self.ct.algorithm + " " + self.name,
-                    "topK_execution_time": execution_time,
-                    "ct_execution_time": self.ct.online_time,
-                    "total_execution_time": execution_time + self.ct.online_time,
-                    "total_subgroups": self.n_subgroups,
-                    "rows": self.D.n_rows(s["final_condition"]),
-                    "overlap": overlap,
+                    # "topK_execution_time": execution_time,
+                    # "ct_execution_time": self.ct.online_time,
+                    "Time": execution_time + self.ct.online_time,
+                    "Total Subgroups": self.n_subgroups,
+                    "Number of rows": self.D.n_rows(s["final_condition"]),
+                    "Overlap": overlap,
                     "K": len(recs),
+                    "Diversity": self.get_diversity(recs),
+                    "t_error": abs(t - s["t_est"]),
+                    "t_r_error": t_r_error,
                 }
             )
-            t_r_error = abs(s["t_r"] - s["t"])
+
             if t_r_error > 0.15:
                 logger.warning(
                     f"{self.ct.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
                 )
 
-            s.update(
-                {
-                    "t_error": abs(s["t"] - s["t_est"]),
-                    "t_r_error": t_r_error,
-                }
-            )
-
         for s in final_recs:
-            s["max_overlap"] = max_overlap
+            s["Max Overlap"] = max_overlap
 
         return pd.DataFrame(final_recs)
 
-    def get_score(self, top_subs: list[int], id: int):  # ID should be in top_subs
-        overlap = self.compute_overlap_for_sub(top_subs, id, sub_in_subs=True)
-        return self.w * self.get_t(id) / self.max_t + (1 - self.w) * (1 - overlap)
+    # def get_score(self, top_subs: list[int], id: int):  # ID should be in top_subs
+    #     overlap = self.compute_overlap_for_sub(top_subs, id, sub_in_subs=True)
+    #     return self.w * self.get_t(id) / self.max_t + (1 - self.w) * (1 - overlap)
 
     def is_valid(self, id: int):
         if self.ct.is_online:
@@ -117,17 +116,17 @@ class TopK:
 
         return False
 
-    def get_worst_overlap(self, subs: list[int]):
-        worst_overlap = 0
-        worst_overlap_idx = -1
-        for i, s1 in enumerate(subs):
-            overlap = sum([self.get_J(s1, s2) for s2 in subs])
+    def get_worst_diversity(self, subs: list[int]):
+        worst_diversity = 1
+        worst_diversity_idx = -1
+        for i, s in enumerate(subs):
+            diversity = self.get_div_of_sub(sub=s, subs=subs)
 
-            if overlap > worst_overlap:
-                worst_overlap = overlap
-                worst_overlap_idx = i
+            if diversity < worst_diversity:
+                worst_diversity = diversity
+                worst_diversity_idx = i
 
-        return worst_overlap / (self.k - 1), worst_overlap_idx
+        return worst_diversity, worst_diversity_idx
 
     def are_groups_valid(self, groups: list, threshold: float):
         for s1 in groups:
@@ -148,10 +147,10 @@ class TopK:
         min_score_idx = -1
 
         for i, s1 in enumerate(subs):
-            overlap = sum([self.get_J(s1, s2) for s2 in subs])
-            overlap /= self.k - 1
 
-            score = self.w * self.get_t(s1) / self.max_t + (1 - self.w) * (1 - overlap)
+            diversity = self.get_div_of_sub(s1, subs)
+
+            score = self.w * self.get_t(s1) / self.max_t + (1 - self.w) * diversity
             total_score += score
             if score < min_score:
                 min_score = score
@@ -190,6 +189,35 @@ class TopK:
         self.op_matrix[id1][id2] = 0
         return 0
 
+    def get_dissimilarity(self, s1: int, s2: int):
+        return self.D.dissimilarity(
+            self.get_sub(s1)["combined"], self.get_sub(s2)["combined"]
+        )
+
+    def get_div_of_sub(self, sub: int, subs: list[int]):
+        total_diversity = 0
+        n = 0
+        for s in subs:
+            if sub != s:
+                total_diversity += self.get_dissimilarity(sub, s)
+                n += 1
+        return total_diversity / n
+
+    def get_diversity(self, subs: list[int]):
+        total_diversity = 0
+        combs = 0
+        for i, s1 in enumerate(subs):
+            for s2 in subs[i + 1 :]:
+                dissimilarity = self.get_dissimilarity(s1, s2)
+                # sub1 = self.get_sub(s1)
+                # sub2 = self.get_sub(s2)
+                # logger.info(
+                #     f"dissimilarity between {sub1['combined']} and {sub2['combined']}: {dissimilarity}"
+                # )
+                total_diversity += dissimilarity
+                combs += 1
+        return total_diversity / (self.k * (self.k - 1) / 2)
+
     def check_n_subs(self, subs: list[int]):
         if len(subs) < self.k:
             logger.warning(
@@ -203,10 +231,10 @@ class OptRes(TopK):
     def __init__(
         self,
         alg: CT | CTP,
-        max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
+        min_diversity=params.TOPK.MIN_DIVERSITY,
     ):
         super().__init__(alg)
-        self.max_overlap = max_overlap
+        self.min_diversity = min_diversity
 
     def scan(self):
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
@@ -220,29 +248,24 @@ class OptRes(TopK):
         recs = [subs[0]]
 
         for sub in subs[1:]:
-            logger.trace(f"Checking sub {sub}")
+            # logger.trace(f"Checking sub {sub}")
             if not self.is_valid(sub):
                 logger.trace(f"Sub {sub} is not valid")
                 continue
 
-            accepted = True
-            for selected in recs:
-                if self.get_J(selected, sub) > self.max_overlap:
-                    logger.trace(
-                        f"Overlap of candidate {sub} with selected {selected} is {round(self.get_J(selected, sub),2)} > {self.max_overlap}"
-                    )
-                    accepted = False
-                    break
-
-            if accepted:
+            if self.get_div_of_sub(sub=sub, subs=recs) > self.min_diversity:
                 recs.append(sub)
                 if len(recs) == self.k:
                     return recs
+            else:
+                logger.trace(
+                    f"Diversity of candidate {sub} with selected recs is {round(self.get_div_of_sub(sub=sub, subs=recs),2)} < {self.min_diversity}"
+                )
 
         return recs
 
 
-class OptOve(TopK):
+class OptDiv(TopK):
     def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
         super().__init__(alg)
         self.percentile = percentile
@@ -260,27 +283,28 @@ class OptOve(TopK):
             return []
 
         percentile_index = int(self.percentile * self.n_subgroups)
-        worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
+        worst_diversity, worst_diversity_idx = self.get_worst_diversity(recs)
 
-        for sub in subs[self.k + 1 : percentile_index]:
-            logger.trace(f"Checking sub {sub}")
+        for sub in subs[:percentile_index]:
+            # logger.trace(f"Checking sub {sub}")
             if self.is_valid(sub):
-                removed_sub = recs.pop(worst_overlap_idx)
+                removed_sub = recs.pop(worst_diversity_idx)
                 recs.append(sub)
 
-                new_overlap, _ = self.get_worst_overlap(recs)
+                new_diversity, _ = self.get_worst_diversity(recs)
 
-                if new_overlap == 0:
-                    break
-
-                if new_overlap > worst_overlap:
-                    logger.trace("Reverting", new_overlap, "with", worst_overlap)
+                if new_diversity < worst_diversity:
+                    # logger.trace("Reverting", new_diversity, "with", worst_diversity)
                     recs.pop(-1)
                     recs.append(removed_sub)
 
                 else:
-                    worst_overlap, worst_overlap_idx = self.get_worst_overlap(recs)
-                    logger.trace("New worst overlap", worst_overlap)
+                    worst_diversity, worst_diversity_idx = self.get_worst_diversity(
+                        recs
+                    )
+                    logger.trace(
+                        f"[OptDiv] - Added new candidate, new worst diversity: {worst_diversity} "
+                    )
 
         return recs
 
@@ -315,7 +339,7 @@ class Sort(TopK):
         return recs
 
 
-class ResOve(TopK):
+class ResDiv(TopK):
     def __init__(self, alg: CT, w=params.TOPK.W):
         super().__init__(alg)
         self.w = w
@@ -337,7 +361,7 @@ class ResOve(TopK):
         _, min_score, min_score_idx = self.get_scores_for_subs(recs)
 
         for sub in subs:
-            logger.trace(f"Checking sub {sub}")
+            # logger.trace(f"Checking sub {sub}")
             if self.is_valid(sub):
                 removed_sub = recs.pop(min_score_idx)
                 recs.append(sub)
@@ -345,12 +369,14 @@ class ResOve(TopK):
                 _, new_score, _ = self.get_scores_for_subs(recs)
 
                 if new_score < min_score:
-                    logger.trace(f"Reverting {new_score} with {min_score}")
+                    # logger.trace(f"Reverting {new_score} with {min_score}")
                     recs.pop(-1)
                     recs.append(removed_sub)
                 else:
+                    logger.debug(
+                        f"[ResDiv] Old score: {min_score}, New score {new_score}"
+                    )
                     _, min_score, min_score_idx = self.get_scores_for_subs(recs)
-                    logger.debug(f"New score: {new_score}, New min score {min_score}")
 
         return recs
 
@@ -388,7 +414,7 @@ class ExhaustiveOptRes(TopK):
     def __init__(
         self,
         alg: CT,
-        max_overlap=params.TOPK.MAX_PAIRWISE_OVERLAP,
+        max_overlap=params.TOPK.MIN_DIVERSITY,
     ):
         super().__init__(alg)
         self.max_overlap = max_overlap
@@ -456,9 +482,9 @@ class NoOve(TopK):
         levels = {}
 
         for id, sub in self.ct.subgroups.items():
-            if sub["depth"] not in levels:
-                levels[sub["depth"]] = []
-            levels[sub["depth"]].append(id)
+            if sub["Depth"] not in levels:
+                levels[sub["Depth"]] = []
+            levels[sub["Depth"]].append(id)
 
         best_cate = 0
         best_ids = []
@@ -515,6 +541,6 @@ class NoOve(TopK):
 #         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-main_no_random = [ResOve, OptRes, NoOve, OptOve]
+main_no_random = [ResDiv, OptRes, NoOve, OptDiv]
 main_competitors = main_no_random + [Random]
 exhaustive = [ExhaustiveResOve, ExhaustiveOptRes]

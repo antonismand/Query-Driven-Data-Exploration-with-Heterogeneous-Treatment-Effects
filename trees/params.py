@@ -31,7 +31,7 @@ class CF:
 
 
 class TOPK:
-    W = 0.7
+    W = 0.5
     K = 5
     MIN_DIVERSITY = 0.2
     PERCENTILE = 0.7

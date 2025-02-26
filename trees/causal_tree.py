@@ -117,12 +117,12 @@ class CT:
                 "id": node_id,
                 "condition": full_condition,
                 "combined": combined,
-                "features": len(combined),
+                "Features": len(combined),
                 "t_est": abs(cate),
                 # "T0": round(self.tree.value[node_id][0][0], 2),
                 # "T1": round(self.tree.value[node_id][1][0], 2),
-                "depth": depth,
-                "algorithm": self.algorithm,
+                "Depth": depth,
+                "estimator": self.algorithm,
                 "parents": parents[:],
             }
 

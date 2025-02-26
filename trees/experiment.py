@@ -23,6 +23,16 @@ mpl.rcParams.update(mpl.rcParamsDefault)
 
 logger.configure(handlers=[{"sink": sys.stderr, "level": DEBUG_LEVEL}])
 
+label_map = {
+    "t_r": r"$|\tau(R_i)|$",  # change to responsiveness?
+    # "t": r"$|\tau(S_i)|$",
+    "Top-K Algorithm": r"Top-$K$ Algorithm",
+    "Time": "Time (s)",
+    "t_est": r"$|\hat{\tau}(S_i)|$",
+    "w": r"$w$",
+    "min_diversity": r"$\theta_D$",
+}
+
 
 class Experiment:
     def __init__(
@@ -146,63 +156,33 @@ class Experiment:
 
         return parameters
 
-    def save_tikzplot(self, x=None, plot=None, hue="algorithm", rotation=0):
+    def save_tikzplot(self, x, y, hue="Top-K Algorithm", rotation=0):
         if x is None:
             x = self.var_name
         if self.exp_name is None:
             self.exp_name = self.var_name
 
-        # plt.figure()
-        if plot == "cate":
-            ax = sns.barplot(x=x, y="t_r", hue=hue, data=self.scores)
-            ax.set_title("True CATE")
-            ax.set_ylabel(r"$|\tau(R_i)|$")
-            ax.tick_params(axis="x", labelrotation=rotation)
-            ax.set_xlabel(r"top-$K$ Algorithm")
+        if x == "Top-K Algorithm":
+            ax = sns.barplot(x=x, y=y, hue=hue, data=self.scores)
+        else:
+            ax = sns.lineplot(x=x, y=y, hue=hue, data=self.scores, errorbar=None)
+            if y == "Time":
+                ax.set_yscale("log")
+                # ax.set_xticks([100000, 500000, 1000000])
+                # ax.set_xticklabels(["100K", "500K", "1M"])
 
-        elif plot == "overlap":
-            ax = sns.barplot(
-                x=x,
-                y="max_overlap",
-                hue=hue,
-                data=self.scores[self.scores["algorithm"] == "[Pretrained] CF"],
-            )
-            ax.set_title("Max Overlap")
-            ax.set_ylabel("Overlap")
-            ax.tick_params(axis="x", labelrotation=rotation)
-            ax.set_xlabel(r"top-$K$ Algorithm")
+                # for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
+                #     line.set_label(label)
 
-        elif plot == "time":
-            ax = sns.lineplot(
-                x=x, y="total_execution_time", hue=hue, data=self.scores, errorbar=None
-            )
-            ax.set_title("Online Execution Time")
-            ax.set_ylabel("Time (s)")
-            ax.set_yscale("log")
-            ax.tick_params(axis="x", labelrotation=rotation)
-            ax.set_xlabel(x)
-
-            # ax.set_xticks([100000, 500000, 1000000])
-            # ax.set_xticklabels(["100K", "500K", "1M"])
-
-            for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
-                line.set_label(label)
-
-        elif plot == "subgroups":
-            ax = sns.barplot(
-                x="max_depth", y="total_execution_time", hue=hue, data=self.scores
-            )
-            ax.set_title("Execution time per subgroup size")
-            ax.set_ylabel("Time (s)")
-            ax.tick_params(axis="x", labelrotation=rotation)
-            ax.set_xlabel("Max depth")
-
+        ax.tick_params(axis="x", labelrotation=rotation)
+        ax.set_xlabel(label_map.get(x, x))
+        ax.set_ylabel(label_map.get(y, y))
         ax.legend(fontsize="x-small")
         plt.draw()
 
         # tikzplotlib.clean_figure()
         tikzplotlib.save(
-            f"../tex/{self.exp_name}-{plot}.tex",
+            f"../tex/{self.exp_name}-{y}.tex",
             extra_axis_parameters=[
                 "scaled x ticks=false",
                 "scaled y ticks=false",
@@ -215,102 +195,44 @@ class Experiment:
         )
         plt.show()
 
-    def plots(self, x=None, hue="algorithm", rotation=0):
+    def two_plots(self, x, y1, y2, hue, rotation):
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+        if x == "Top-K Algorithm":
+            sns.barplot(x=x, y=y1, hue=hue, data=self.scores, ax=axs[0])
+        else:
+            sns.lineplot(x=x, y=y1, hue=hue, data=self.scores, ax=axs[0])
+
+        axs[0].set_xlabel(label_map.get(x, x))
+        axs[0].set_ylabel(label_map.get(y1, y1))
+        axs[0].tick_params(axis="x", labelrotation=rotation)
+        axs[0].legend(fontsize="x-small")
+
+        if x == "Top-K Algorithm":
+            sns.barplot(x=x, y=y2, hue=hue, data=self.scores, ax=axs[1])
+        else:
+            sns.lineplot(x=x, y=y2, hue=hue, data=self.scores, ax=axs[1])
+
+        axs[1].tick_params(axis="x", labelrotation=rotation)
+        axs[1].set_xlabel(label_map.get(x, x))
+        axs[1].set_ylabel(label_map.get(y2, y2))
+        axs[1].legend([], [], frameon=False)
+        plt.show()
+
+    def plots(self, x=None, hue="Top-K Algorithm", rotation=0):
 
         if x is None:
             x = self.var_name
 
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        sns.barplot(x=x, y="t_r", hue=hue, data=self.scores, ax=axs[0])
-        axs[0].set_title(f"True CATE (higher is better)")
-        axs[0].set_ylabel(r"$\tau(R_i)$")
-        axs[0].tick_params(axis="x", labelrotation=rotation)
-        axs[0].legend(fontsize="x-small")
+        self.two_plots(x, y1="t_r", y2="Diversity", hue=hue, rotation=rotation)
 
-        sns.barplot(x=x, y="t_est", hue=hue, data=self.scores, ax=axs[1])
-        axs[1].set_title(f"Estimated CATE")
-        axs[1].set_ylabel(r"$\hat{\tau}(S_i)$")
-        axs[1].tick_params(axis="x", labelrotation=rotation)
-        axs[1].legend([], [], frameon=False)
-        plt.show()
+        self.two_plots(x, y1="t_est", y2="Max Overlap", hue=hue, rotation=rotation)
 
-        # ----------------- #
+        self.two_plots(x, y1="Total Subgroups", y2="Time", hue=hue, rotation=rotation)
 
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        sns.barplot(x=x, y="diversity", hue=hue, data=self.scores, ax=axs[0])
-        axs[0].set_title(f"Diversity")
-        axs[0].set_ylabel("Diversity")
-        axs[0].tick_params(axis="x", labelrotation=rotation)
-        axs[0].legend(fontsize="x-small")
+        self.two_plots(x, y1="Depth", y2="Features", hue=hue, rotation=rotation)
 
-        sns.barplot(x=x, y="max_overlap", hue=hue, data=self.scores, ax=axs[1])
-        axs[1].set_title(f"Max Overlap")
-        axs[1].set_ylabel("max(overlap)")
-        axs[1].tick_params(axis="x", labelrotation=rotation)
-        axs[1].legend(fontsize="x-small")
-
-        # ----------------- #
-
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        sns.barplot(x=x, y="total_subgroups", hue=hue, data=self.scores, ax=axs[0])
-        axs[0].set_title(f"Total subgroups")
-        axs[0].tick_params(axis="x", labelrotation=rotation)
-        axs[0].legend(fontsize="x-small")
-
-        sns.barplot(x=x, y="total_execution_time", hue=hue, data=self.scores, ax=axs[1])
-        axs[1].set_title(f"Online Execution Time")
-        axs[1].tick_params(axis="x", labelrotation=rotation)
-        axs[1].set_ylabel("Time (s)")
-        axs[1].legend([], [], frameon=False)
-        plt.show()
-
-        # ----------------- #
-
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        sns.barplot(x=x, y="depth", hue=hue, data=self.scores, ax=axs[0])
-        axs[0].set_title(f"Depth")
-        axs[0].tick_params(axis="x", labelrotation=rotation)
-        axs[0].legend(fontsize="x-small")
-
-        sns.barplot(x=x, y="features", hue=hue, data=self.scores, ax=axs[1])
-        axs[1].set_title(f"Features")
-        axs[1].tick_params(axis="x", labelrotation=rotation)
-        axs[1].legend([], [], frameon=False)
-        plt.show()
-
-        # ----------------- #
-
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        sns.barplot(x=x, y="t_error", hue=hue, data=self.scores, ax=axs[0])
-        axs[0].set_title(f"Prediction error")
-        axs[0].set_ylabel(r"$|\tau(S_i) - \hat{\tau}(S_i)|$")
-        axs[0].tick_params(axis="x", labelrotation=rotation)
-
-        axs[0].legend(fontsize="x-small")
-
-        sns.barplot(x=x, y="t_r_error", hue=hue, data=self.scores, ax=axs[1])
-        axs[1].set_title(f"False Estimation")
-        axs[1].set_ylabel(r"$|\tau(R_i) - \tau(S_i)|$")
-        axs[1].tick_params(axis="x", labelrotation=rotation)
-        axs[1].legend([], [], frameon=False)
-        plt.show()
-
-        # ----------------- #
-
-        # sns.barplot(x=x, y="valid_subgroups", hue=hue, data=scores, ax=axs[1])
-        # axs[1].set_title(f"Valid subgroups")
-        # axs[1].tick_params(axis="x", labelrotation=rotation)
-        # axs[1].legend([], [], frameon=False)
-        # plt.show()
-
-        # ----------------- #
-
-        # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        # sns.barplot(x=x, y="ct_execution_time", hue=hue, data=scores, ax=axs[0])
-        # axs[0].set_title(f"Filtering Time")
-        # axs[0].tick_params(axis="x", labelrotation=rotation)
-        # axs[0].set_ylabel("Time (s)")
-        # axs[0].legend(fontsize="x-small")
+        self.two_plots(x, y1="t_error", y2="t_r_error", hue=hue, rotation=rotation)
 
 
 class LoadExperiment(Experiment):
