@@ -414,10 +414,10 @@ class ExhaustiveOptRes(TopK):
     def __init__(
         self,
         alg: CT,
-        max_overlap=params.TOPK.MIN_DIVERSITY,
+        min_diversity=params.TOPK.MIN_DIVERSITY,
     ):
         super().__init__(alg)
-        self.max_overlap = max_overlap
+        self.min_diversity = min_diversity
 
     def scan(self):
         best_cate = 0
@@ -433,8 +433,7 @@ class ExhaustiveOptRes(TopK):
             itertools.combinations(valid_subs, self.k),
             total=comb(len(valid_subs), self.k),
         ):
-
-            if self.are_groups_valid(candidates, self.max_overlap):
+            if self.get_diversity(candidates) > self.min_diversity:
                 cate = sum([self.get_t(c) for c in candidates])
                 if cate > best_cate:
                     logger.debug(

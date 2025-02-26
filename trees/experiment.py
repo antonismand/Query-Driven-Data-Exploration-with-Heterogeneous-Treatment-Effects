@@ -31,6 +31,8 @@ label_map = {
     "t_est": r"$|\hat{\tau}(S_i)|$",
     "w": r"$w$",
     "min_diversity": r"$\theta_D$",
+    "n": "Dataset Size",
+    "max_depth": "Max Depth",
 }
 
 
@@ -166,13 +168,13 @@ class Experiment:
             ax = sns.barplot(x=x, y=y, hue=hue, data=self.scores)
         else:
             ax = sns.lineplot(x=x, y=y, hue=hue, data=self.scores, errorbar=None)
-            if y == "Time":
-                ax.set_yscale("log")
-                # ax.set_xticks([100000, 500000, 1000000])
-                # ax.set_xticklabels(["100K", "500K", "1M"])
+            if x == "n" and y == "Time":
+                # ax.set_yscale("log")
+                ax.set_xticks([100000, 500000, 1000000])
+                ax.set_xticklabels(["100K", "500K", "1M"])
 
-                # for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
-                #     line.set_label(label)
+                for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
+                    line.set_label(label)
 
         ax.tick_params(axis="x", labelrotation=rotation)
         ax.set_xlabel(label_map.get(x, x))
