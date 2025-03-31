@@ -227,7 +227,7 @@ class TopK:
         return True
 
 
-class OptRes(TopK):
+class DiCoR(TopK):
     def __init__(
         self,
         alg: CT | CTP,
@@ -265,7 +265,7 @@ class OptRes(TopK):
         return recs
 
 
-class OptDiv(TopK):
+class ReCoD(TopK):
     def __init__(self, alg: CT, percentile=params.TOPK.PERCENTILE):
         super().__init__(alg)
         self.percentile = percentile
@@ -303,7 +303,7 @@ class OptDiv(TopK):
                         recs
                     )
                     logger.trace(
-                        f"[OptDiv] - Added new candidate, new worst diversity: {worst_diversity} "
+                        f"{self.name} - Added new candidate, new worst diversity: {worst_diversity} "
                     )
 
         return recs
@@ -339,7 +339,7 @@ class Sort(TopK):
         return recs
 
 
-class ResDiv(TopK):
+class DiRe(TopK):
     def __init__(self, alg: CT, w=params.TOPK.W):
         super().__init__(alg)
         self.w = w
@@ -374,14 +374,14 @@ class ResDiv(TopK):
                     recs.append(removed_sub)
                 else:
                     logger.debug(
-                        f"[ResDiv] Old score: {min_score}, New score {new_score}"
+                        f"{self.name} Old score: {min_score}, New score {new_score}"
                     )
                     _, min_score, min_score_idx = self.get_scores_for_subs(recs)
 
         return recs
 
 
-class ExhaustiveResOve(TopK):
+class ExhaustiveDiRe(TopK):
     def __init__(self, alg: CT, w=params.TOPK.W):
         super().__init__(alg)
         self.w = w
@@ -410,7 +410,7 @@ class ExhaustiveResOve(TopK):
         return best_subs
 
 
-class ExhaustiveOptRes(TopK):
+class ExhaustiveDiCoR(TopK):
     def __init__(
         self,
         alg: CT,
@@ -445,35 +445,34 @@ class ExhaustiveOptRes(TopK):
         return best_subs
 
 
-# class ExhaustiveOptOve(TopK):
-#     def __init__(self, alg: CT):
-#         super().__init__(alg)
+class ExhaustiveReCoD(TopK):
+    def __init__(self, alg: CT):
+        super().__init__(alg)
 
-#     def scan(self):
-#         best_overlap = 999999
+    def scan(self):
+        best_diversity = 0
 
-#         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
-#         valid_subs = [s for s in subs if self.is_valid(s)]
+        subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
+        valid_subs = [s for s in subs if self.is_valid(s)]
 
-#         logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
-#         valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
+        logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
+        valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
 
-#         for candidates in tqdm(
-#             itertools.combinations(valid_subs, self.k),
-#             total=comb(len(valid_subs), self.k),
-#         ):
-#             for s1 in candidates:
-#                 overlap = sum([self.get_J(s1, s2) for s2 in candidates])
+        for candidates in tqdm(
+            itertools.combinations(valid_subs, self.k),
+            total=comb(len(valid_subs), self.k),
+        ):
+            diversity = self.get_diversity(candidates)
 
-#             if overlap < best_overlap:
-#                 logger.debug(f"NEW overlap:{overlap} previous: {best_overlap}")
-#                 best_overlap = overlap
-#                 best_subs = candidates[:]
+            if diversity > best_diversity:
+                logger.debug(f"NEW diversity:{diversity} previous: {best_diversity}")
+                best_diversity = diversity
+                best_subs = candidates[:]
 
-#         return best_subs
+        return best_subs
 
 
-class LevelBased(TopK):
+class LoRe(TopK):
     def __init__(self, alg: CT):
         super().__init__(alg)
 
@@ -540,6 +539,13 @@ class LevelBased(TopK):
 #         return [c["id"] for c in levels[level][0 : self.k]]
 
 
-main_no_random = [LevelBased, ResDiv, OptRes, OptDiv]
+main_no_random = [LoRe, DiRe, DiCoR, ReCoD]
 main_competitors = main_no_random + [Random]
-exhaustive = [ExhaustiveResOve, ExhaustiveOptRes]
+exhaustive_comparison = [
+    ExhaustiveDiRe,
+    DiRe,
+    ExhaustiveDiCoR,
+    DiCoR,
+    ExhaustiveReCoD,
+    ReCoD,
+]

@@ -15,6 +15,7 @@ from trees.data import Data
 from trees.topk import *
 from trees.causal_tree import CT, CTP
 from trees.causal_forest import CFT
+from trees.linear import LinearIV
 from trees.topk import *
 from trees.params import DEBUG_LEVEL
 from datetime import timedelta
@@ -24,7 +25,7 @@ mpl.rcParams.update(mpl.rcParamsDefault)
 logger.configure(handlers=[{"sink": sys.stderr, "level": DEBUG_LEVEL}])
 
 label_map = {
-    "t_r": r"$|\tau(R_i)|$",  # change to responsiveness?
+    "t_r": "Responsiveness",
     # "t": r"$|\tau(S_i)|$",
     "Top-K Algorithm": r"Top-$K$ Algorithm",
     "Time": "Time (s)",
@@ -71,6 +72,9 @@ class Experiment:
                 param_dict["seed"] = exp
                 logger.info("Generating data: {}", param_dict)
                 data.generate(**param_dict)
+
+                if "mode" in param_dict and param_dict["mode"] == 6:
+                    cate_models = [LinearIV]
 
                 cts = [ct() for ct in cate_models]
                 for ct in cts:

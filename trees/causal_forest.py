@@ -89,7 +89,7 @@ class CF:
         if parent_id is not None:
             # cond = "<=" if left else ">"
             num = round(tree.threshold[parent_id], 5)
-            feature = "feature_" + str(tree.feature[parent_id])
+            feature = self.features[tree.feature[parent_id]]
             if left:
                 cond = "<="
                 interval = (self.D.min_max[feature][0], num)
@@ -147,7 +147,7 @@ class CF:
     def get_important_features(self, threshold=0.01):
         important_features = []
         for i, fi in enumerate(self.forest.feature_importances_):
-            logger.trace(f"{self.features[i]}: {fi}")
+            logger.info(f"{self.features[i]}: {fi}")
             if fi > threshold:
                 important_features.append(self.features[i])
         return important_features
@@ -175,7 +175,7 @@ class CFT(CF):
     ):
         self.df = D.df
         self.D = D
-        forest: CausalForestDML = CausalForestDML(
+        self.forest: CausalForestDML = CausalForestDML(
             n_estimators=n_estimators,
             criterion=criterion,
             discrete_treatment=True,
@@ -194,13 +194,13 @@ class CFT(CF):
         )
 
         if tune:
-            forest.tune(
+            self.forest.tune(
                 X=self.df[self.features].to_numpy(),
                 Y=self.df["outcome"].to_numpy(),
                 T=self.df["treatment"].to_numpy(),
             )
 
-        forest.fit(
+        self.forest.fit(
             X=self.df[self.features].to_numpy(),
             Y=self.df["outcome"].to_numpy(),
             T=self.df["treatment"].to_numpy(),
@@ -211,7 +211,7 @@ class CFT(CF):
             max_depth=max_depth,
             min_samples_leaf=min_samples_leaf,
         )
-        intrp.interpret(forest, self.df[self.features].to_numpy())
+        intrp.interpret(self.forest, self.df[self.features].to_numpy())
 
         if print_tree:
             plt.figure(figsize=(25, 5))

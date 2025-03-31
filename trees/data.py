@@ -23,6 +23,9 @@ class Data:
     ):
         np.random.seed(seed)
 
+        if mode == 6:
+            return self.ab_data()
+
         Y, X, T, tau, _, _ = synthetic_data(
             mode=mode, n=n, p=p, sigma=sigma
         )  # Simulate randomized trial: mode=2
@@ -36,6 +39,7 @@ class Data:
         df["id"] = df.index
         self.max_t = df["ITE"].max()
         self.p = None
+        self.Z = None
 
         if mode == 1 or mode == 2:
             self.hte_features = ["feature_0", "feature_1"]
@@ -43,6 +47,67 @@ class Data:
             self.hte_features = ["feature_" + str(i) for i in range(5)]
         elif mode == 5:
             self.hte_features = ["feature_" + str(i) for i in range(p)]
+
+        self.rest_features = [
+            f for f in self.feature_names if f not in self.hte_features
+        ]
+
+        # if override_p_with_2:
+        #     self.feature_names = ["feature_0", "feature_1"]
+        #     df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
+
+        self.df = pl.DataFrame(df)
+
+        min_values = df[self.feature_names].min()
+        max_values = df[self.feature_names].max()
+
+        self.min_max = {
+            column: (round(min_values[column], 3), round(max_values[column], 3))
+            for column in self.feature_names
+        }
+
+        return df.describe()
+
+    def ab_data(self):
+
+        ab_data = pd.read_csv(DATA.AB_DATA)
+
+        self.Z = ab_data["easier_signup"]  # nudge, or instrument
+        self.T = ab_data["became_member"]  # intervention, or treatment
+        self.Y = ab_data["days_visited_post"]  # outcome of interest
+        self.X = ab_data.drop(
+            columns=[
+                "easier_signup",
+                "became_member",
+                "days_visited_post",
+            ]
+        )  # features
+
+        df = pd.DataFrame(self.X)
+        self.feature_names = list(df.columns)
+
+        # self.hte_features = self.feature_names
+
+        self.hte_features = [
+            "days_visited_free_pre",
+            "days_visited_hs_pre",
+            "os_type_osx",
+        ]
+
+        def TE_fn(X):
+            return (
+                0.2
+                + 0.3 * X["days_visited_free_pre"]
+                - 0.2 * X["days_visited_hs_pre"]
+                + X["os_type_osx"]
+            ).values
+
+        df["outcome"] = self.Y
+        df["treatment"] = self.T
+        df["ITE"] = TE_fn(self.X)
+        df["id"] = df.index
+        self.max_t = df["ITE"].max()
+        self.p = None
 
         self.rest_features = [
             f for f in self.feature_names if f not in self.hte_features

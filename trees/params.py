@@ -4,6 +4,7 @@ class DATA:
     SIGMA = 3.0
     SEED = 42
     MODE = 2
+    AB_DATA = "../datasets/ab_sample.csv"
 
 
 class P:
@@ -30,13 +31,20 @@ class CF:
     TRAIN_IN_ALL_FEATURES = False
 
 
+class LINEARIV:
+    MAX_DEPTH = 12
+    MIN_SAMPLES_SPLIT = 30
+    MIN_SAMPLES_LEAF = 20
+    TRAIN_IN_ALL_FEATURES = False
+
+
 class TOPK:
     W = 0.5
     K = 5
     MIN_DIVERSITY = 0.2
     PERCENTILE = 0.7
     N_MIN_ROWS = 20
-    EXHAUSTIVE_TOPK = 100
+    EXHAUSTIVE_TOPK = 500
 
 
 # DEBUG_LEVEL = "TRACE"
