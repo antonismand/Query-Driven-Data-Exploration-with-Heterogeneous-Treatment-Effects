@@ -5,6 +5,7 @@ class DATA:
     SEED = 42
     MODE = 2
     AB_DATA = "../datasets/ab_sample.csv"
+    UPLIFT_DATA = "../datasets/criteo-uplift-v2.1.csv"
 
 
 class P:

@@ -61,10 +61,10 @@ class LinearIV(CF):
         )
 
         model.fit(
-            Y=self.D.Y,
-            T=self.D.T,
-            Z=self.D.Z,
-            X=self.D.X[self.features],
+            Y=D.df["outcome"],
+            T=D.df["treatment"],
+            Z=D.df["instrument"],
+            X=D.df[self.features],
             inference="statsmodels",
         )
 
@@ -75,7 +75,7 @@ class LinearIV(CF):
             max_depth=max_depth,
             min_samples_leaf=min_samples_leaf,
         )
-        intrp.interpret(model, self.D.X[self.features].to_numpy())
+        intrp.interpret(model, D.df[self.features].to_numpy())
 
         if print_tree:
             plt.figure(figsize=(25, 5))

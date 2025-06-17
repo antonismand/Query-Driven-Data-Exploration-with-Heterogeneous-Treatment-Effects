@@ -22,9 +22,12 @@ class Data:
         # override_p_with_2=False,
     ):
         np.random.seed(seed)
+        self.mode = mode
 
         if mode == 6:
             return self.ab_data()
+        elif mode in [71, 72]:
+            return self.uplift_data()
 
         Y, X, T, tau, _, _ = synthetic_data(
             mode=mode, n=n, p=p, sigma=sigma
@@ -72,21 +75,15 @@ class Data:
 
         ab_data = pd.read_csv(DATA.AB_DATA)
 
-        self.Z = ab_data["easier_signup"]  # nudge, or instrument
-        self.T = ab_data["became_member"]  # intervention, or treatment
-        self.Y = ab_data["days_visited_post"]  # outcome of interest
-        self.X = ab_data.drop(
-            columns=[
-                "easier_signup",
-                "became_member",
-                "days_visited_post",
-            ]
-        )  # features
+        ab_data.rename(columns={"easier_signup": "instrument"}, inplace=True)
+        ab_data.rename(columns={"became_member": "treatment"}, inplace=True)
+        ab_data.rename(columns={"days_visited_post": "outcome"}, inplace=True)
 
-        df = pd.DataFrame(self.X)
-        self.feature_names = list(df.columns)
-
-        # self.hte_features = self.feature_names
+        self.feature_names = [
+            col
+            for col in ab_data.columns
+            if col not in {"instrument", "treatment", "outcome"}
+        ]
 
         self.hte_features = [
             "days_visited_free_pre",
@@ -102,11 +99,52 @@ class Data:
                 + X["os_type_osx"]
             ).values
 
-        df["outcome"] = self.Y
-        df["treatment"] = self.T
-        df["ITE"] = TE_fn(self.X)
+        ab_data["ITE"] = TE_fn(ab_data)
+        ab_data["id"] = ab_data.index
+        self.max_t = ab_data["ITE"].max()
+        self.p = None
+
+        self.rest_features = [
+            f for f in self.feature_names if f not in self.hte_features
+        ]
+
+        # if override_p_with_2:
+        #     self.feature_names = ["feature_0", "feature_1"]
+        #     df = df[["feature_0", "feature_1", "outcome", "treatment", "ITE", "id"]]
+
+        self.df = ab_data.copy()
+        # self.df = pl.DataFrame(ab_data)
+
+        min_values = ab_data[self.feature_names].min()
+        max_values = ab_data[self.feature_names].max()
+
+        self.min_max = {
+            column: (round(min_values[column], 3), round(max_values[column], 3))
+            for column in self.feature_names
+        }
+
+        return ab_data.describe()
+
+    def uplift_data(self):
+
+        df = pd.read_csv(DATA.UPLIFT_DATA)
+        # df = df.sample(frac=0.3, random_state=42)
+
+        self.feature_names = list(df.columns[0:12])
+
+        # self.hte_features = self.feature_names
+
+        if self.mode == 71:
+            df.rename(columns={"visit": "outcome"}, inplace=True)
+            self.hte_features = ["f0", "f2", "f3", "f6", "f8", "f9"]
+
+        else:
+            df.rename(columns={"conversion": "outcome"}, inplace=True)
+            self.hte_features = ["f2", "f3", "f4", "f6", "f8", "f9", "f10", "f11"]
+
+        # df["ITE"] = 1
         df["id"] = df.index
-        self.max_t = df["ITE"].max()
+        self.max_t = 1
         self.p = None
 
         self.rest_features = [

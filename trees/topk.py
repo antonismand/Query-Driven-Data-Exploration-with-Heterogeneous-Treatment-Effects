@@ -54,41 +54,51 @@ class TopK:
 
         final_recs: list[dict] = [self.copy_sub(s) for s in recs]
 
-        max_overlap = 0
-
         for s in final_recs:
-            overlap = self.compute_overlap_for_sub(recs, s["id"], sub_in_subs=True)
-            if overlap > max_overlap:
-                max_overlap = overlap
-            t = self.D.CATE(s["condition"])
-            t_r = self.D.CATE(s["final_condition"])
-            t_r_error = abs(t_r - t)
             s.update(
                 {
-                    "t": t,
-                    "t_r": t_r,
                     "Top-K Algorithm": self.name,
                     "variant": self.ct.algorithm + " " + self.name,
                     # "topK_execution_time": execution_time,
                     # "ct_execution_time": self.ct.online_time,
                     "Time": execution_time + self.ct.online_time,
                     "Total Subgroups": self.n_subgroups,
-                    "Number of rows": self.D.n_rows(s["final_condition"]),
-                    "Overlap": overlap,
                     "K": len(recs),
                     "Diversity": self.get_diversity(recs),
-                    "t_error": abs(t - s["t_est"]),
-                    "t_r_error": t_r_error,
                 }
             )
 
-            if t_r_error > 0.15:
-                logger.warning(
-                    f"{self.ct.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
+            if self.D.mode in [71, 72]:
+                s.update({"t_r": s["t_est"]})
+            else:
+                max_overlap = 0
+                overlap = self.compute_overlap_for_sub(recs, s["id"], sub_in_subs=True)
+                if overlap > max_overlap:
+                    max_overlap = overlap
+
+                t = self.D.CATE(s["condition"])
+                t_r = self.D.CATE(s["final_condition"])
+                t_r_error = abs(t_r - t)
+
+                s.update(
+                    {
+                        "t": t,
+                        "t_r": t_r,
+                        "Overlap": overlap,
+                        "Number of rows": self.D.n_rows(s["final_condition"]),
+                        "t_error": abs(t - s["t_est"]),
+                        "t_r_error": t_r_error,
+                    }
                 )
 
-        for s in final_recs:
-            s["Max Overlap"] = max_overlap
+                if t_r_error > 0.15:
+                    logger.warning(
+                        f"{self.ct.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
+                    )
+
+        if self.D.mode not in [71, 72]:
+            for s in final_recs:
+                s["Max Overlap"] = max_overlap
 
         return pd.DataFrame(final_recs)
 

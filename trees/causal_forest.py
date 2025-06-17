@@ -1,4 +1,6 @@
+import os
 from econml.dml import CausalForestDML
+import joblib
 from loguru import logger
 import pandas as pd
 from tqdm import tqdm
@@ -175,49 +177,59 @@ class CFT(CF):
     ):
         self.df = D.df
         self.D = D
-        self.forest: CausalForestDML = CausalForestDML(
-            n_estimators=n_estimators,
-            criterion=criterion,
-            discrete_treatment=True,
-            random_state=123,
-            model_t=RandomForestClassifier(),
-            model_y=WeightedLassoCVWrapper(),
-            max_depth=max_depth,
-            cv=cv,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf,
-            max_features=max_features,
-        )
 
         self.features = (
             self.D.feature_names if train_in_all_features else self.D.hte_features
         )
 
-        if tune:
-            self.forest.tune(
+        if self.D.mode in [71, 72] and os.path.exists(f"tree_{self.D.mode}.pkl"):
+            final_tree = joblib.load(f"tree_{self.D.mode}.pkl")
+        else:
+            self.forest: CausalForestDML = CausalForestDML(
+                n_estimators=n_estimators,
+                criterion=criterion,
+                discrete_treatment=True,
+                random_state=123,
+                model_t=RandomForestClassifier(),
+                model_y=WeightedLassoCVWrapper(),
+                max_depth=max_depth,
+                cv=cv,
+                min_samples_split=min_samples_split,
+                min_samples_leaf=min_samples_leaf,
+                max_features=max_features,
+            )
+
+            if tune:
+                self.forest.tune(
+                    X=self.df[self.features].to_numpy(),
+                    Y=self.df["outcome"].to_numpy(),
+                    T=self.df["treatment"].to_numpy(),
+                )
+
+            self.forest.fit(
                 X=self.df[self.features].to_numpy(),
                 Y=self.df["outcome"].to_numpy(),
                 T=self.df["treatment"].to_numpy(),
             )
 
-        self.forest.fit(
-            X=self.df[self.features].to_numpy(),
-            Y=self.df["outcome"].to_numpy(),
-            T=self.df["treatment"].to_numpy(),
-        )
+            intrp = SingleTreeCateInterpreter(
+                include_model_uncertainty=True,
+                max_depth=max_depth,
+                min_samples_leaf=min_samples_leaf,
+            )
+            intrp.interpret(self.forest, self.df[self.features].to_numpy())
 
-        intrp = SingleTreeCateInterpreter(
-            include_model_uncertainty=True,
-            max_depth=max_depth,
-            min_samples_leaf=min_samples_leaf,
-        )
-        intrp.interpret(self.forest, self.df[self.features].to_numpy())
+            if print_tree:
+                plt.figure(figsize=(25, 5))
+                intrp.plot(feature_names=self.features, fontsize=12)
 
-        if print_tree:
-            plt.figure(figsize=(25, 5))
-            intrp.plot(feature_names=self.features, fontsize=12)
+            final_tree = intrp.tree_model_.tree_
 
-        final_tree = intrp.tree_model_.tree_
+            if self.D.mode in [71, 72] and not os.path.exists(
+                f"tree_{self.D.mode}.pkl"
+            ):
+                joblib.dump(final_tree, f"tree_{self.D.mode}.pkl")
+                print(f"Model tree_{self.D.mode} saved.")
         self.parse_tree(final_tree)
 
     def online(self):

@@ -13,7 +13,6 @@ import matplotlib as mpl
 from loguru import logger
 from trees.data import Data
 from trees.topk import *
-from trees.causal_tree import CT, CTP
 from trees.causal_forest import CFT
 from trees.linear import LinearIV
 from trees.topk import *
@@ -70,11 +69,15 @@ class Experiment:
             for exp in range(data_iterations):
                 data = Data()
                 param_dict["seed"] = exp
-                logger.info("Generating data: {}", param_dict)
+                if param_dict["mode"] in (1, 2, 3, 4, 5):
+                    logger.info("Generating data: {}", param_dict)
                 data.generate(**param_dict)
 
                 if "mode" in param_dict and param_dict["mode"] == 6:
-                    cate_models = [LinearIV]
+
+                    cate_models = [
+                        LinearIV
+                    ]  # be careful it overrides the default param
 
                 cts = [ct() for ct in cate_models]
                 for ct in cts:
@@ -316,7 +319,7 @@ class TopKExperiment(Experiment):
             self.scores.to_csv(f"../csv/{self.exp_name}.csv", index=False)
 
 
-def single_run(cate_model=CTP, topk_method=None, seed=0):
+def single_run(cate_model=CFT, topk_method=None, seed=0):
     D = Data()
     D.generate(seed=seed)
 
