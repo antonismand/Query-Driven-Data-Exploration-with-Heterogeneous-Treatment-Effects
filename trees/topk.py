@@ -68,7 +68,7 @@ class TopK:
                 }
             )
 
-            if self.D.mode in [71, 72]:
+            if self.D.mode in ["CU-visit", "CU-conversion"]:
                 s.update({"t_r": s["t_est"]})
             else:
                 max_overlap = 0
@@ -96,7 +96,7 @@ class TopK:
                         f"{self.ct.algorithm} - {self.name} - |t_r-t|={t_r_error} are different. P: {self.D.p} Subgroup: {s['condition']}"
                     )
 
-        if self.D.mode not in [71, 72]:
+        if self.D.mode not in ["CU-visit", "CU-conversion"]:
             for s in final_recs:
                 s["Max Overlap"] = max_overlap
 

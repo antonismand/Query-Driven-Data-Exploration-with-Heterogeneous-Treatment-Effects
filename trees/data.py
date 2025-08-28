@@ -145,7 +145,7 @@ class Data:
             df.rename(columns={"conversion": "outcome"}, inplace=True)
             self.hte_features = ["f2", "f3", "f4", "f6", "f8", "f9", "f10", "f11"]
 
-        # df["ITE"] = 1
+        df["ITE"] = 1
         df["id"] = df.index
         self.max_t = 1
         self.p = None
