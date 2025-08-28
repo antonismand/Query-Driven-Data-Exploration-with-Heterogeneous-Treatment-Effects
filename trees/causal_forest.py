@@ -182,9 +182,15 @@ class CFT(CF):
             self.D.feature_names if train_in_all_features else self.D.hte_features
         )
 
-        if self.D.mode in [71, 72] and os.path.exists(f"tree_{self.D.mode}.pkl"):
-            final_tree = joblib.load(f"tree_{self.D.mode}.pkl")
+        model = f"../models/CFT_{self.D.mode}.pkl"
+
+        if params.CF.USE_PRETRAINED and os.path.exists(model):
+            final_tree = joblib.load(model)
+            logger.info(f"Using pretrained model {model}")
+
         else:
+            if params.CF.USE_PRETRAINED:
+                logger.info(f"Pretrained model {model} not found. Training new model.")
             self.forest: CausalForestDML = CausalForestDML(
                 n_estimators=n_estimators,
                 criterion=criterion,
@@ -225,11 +231,9 @@ class CFT(CF):
 
             final_tree = intrp.tree_model_.tree_
 
-            if self.D.mode in [71, 72] and not os.path.exists(
-                f"tree_{self.D.mode}.pkl"
-            ):
-                joblib.dump(final_tree, f"tree_{self.D.mode}.pkl")
-                print(f"Model tree_{self.D.mode} saved.")
+            if params.CF.USE_PRETRAINED:
+                joblib.dump(final_tree, model)
+                logger.info(f"Model {model} saved.")
         self.parse_tree(final_tree)
 
     def online(self):

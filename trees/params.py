@@ -2,8 +2,8 @@ class DATA:
     N_ROWS = 100000
     N_FEATURES = 10
     SIGMA = 3.0
-    SEED = 42
-    MODE = 2
+    SEED = 0
+    MODE = "RCT"
     AB_DATA = "../datasets/ab_sample.csv"
     UPLIFT_DATA = "../datasets/criteo-uplift-v2.1.csv"
 
@@ -12,6 +12,7 @@ class P:
     MIN_S = 0.3
     MAX_S = 0.95
     FEATURES_IN_P = "all"
+    # FEATURES_IN_P = ["feature_0"]
 
 
 class CT:
@@ -30,6 +31,7 @@ class CF:
     MIN_SAMPLES_LEAF = 20
     MAX_FEATURES = "auto"
     TRAIN_IN_ALL_FEATURES = False
+    USE_PRETRAINED = True
 
 
 class LINEARIV:

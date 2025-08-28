@@ -33,6 +33,8 @@ label_map = {
     "min_diversity": r"$\theta_D$",
     "n": "Dataset Size",
     "max_depth": "Max Depth",
+    "t_error": r"CATE Error $|\tau(S_i)-\hat{\tau}(S_i)|$",
+    "t_r_error": r"Subgroup Error $|\tau(R_i)-\tau(S_i)|$",
 }
 
 
@@ -42,7 +44,7 @@ class Experiment:
         var_name: str,
         exp_name: str = None,
         data_iterations=1,
-        user_iterations=30,
+        user_iterations=50,
         cate_models=[CFT],
         topk_methods=main_competitors,
         save_csv=True,
@@ -177,8 +179,11 @@ class Experiment:
             ax = sns.lineplot(x=x, y=y, hue=hue, data=self.scores, errorbar=None)
             if x == "n" and y == "Time":
                 # ax.set_yscale("log")
-                ax.set_xticks([100000, 500000, 1000000])
-                ax.set_xticklabels(["100K", "500K", "1M"])
+                xticks = sorted(list(set(self.scores["n"])))
+                ax.set_xticks(xticks)
+                ax.set_xticklabels(
+                    [f"{i//1000}K" if i < 1000000 else f"{i//1000000}M" for i in xticks]
+                )
 
             for line, label in zip(ax.get_lines(), self.scores[hue].unique()):
                 line.set_label(label)

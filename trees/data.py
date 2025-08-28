@@ -24,14 +24,27 @@ class Data:
         np.random.seed(seed)
         self.mode = mode
 
-        if mode == 6:
+        if mode == "OTC":
             return self.ab_data()
-        elif mode in [71, 72]:
+        elif mode in ["CU-visit", "CU-conversion"]:
             return self.uplift_data()
 
-        Y, X, T, tau, _, _ = synthetic_data(
-            mode=mode, n=n, p=p, sigma=sigma
-        )  # Simulate randomized trial: mode=2
+        if mode == "RCT":
+            self.hte_features = ["feature_0", "feature_1"]
+            mode = 2
+        elif mode == "UTC":
+            self.hte_features = ["feature_" + str(i) for i in range(5)]
+            mode = 4
+        elif mode == "UTC-f1-f4":  # missing first
+            self.hte_features = ["feature_" + str(i) for i in range(1, 5)]
+            mode = 4
+        elif mode == "UTC-f0-f9":  # all
+            self.hte_features = ["feature_" + str(i) for i in range(p)]
+            mode = 4
+        # elif mode == 5:
+        #     self.hte_features = ["feature_" + str(i) for i in range(p)]
+
+        Y, X, T, tau, _, _ = synthetic_data(mode=mode, n=n, p=p, sigma=sigma)
 
         df = pd.DataFrame(X)
         self.feature_names = [f"feature_{i}" for i in range(X.shape[1])]
@@ -43,13 +56,6 @@ class Data:
         self.max_t = df["ITE"].max()
         self.p = None
         self.Z = None
-
-        if mode == 1 or mode == 2:
-            self.hte_features = ["feature_0", "feature_1"]
-        elif mode == 4:
-            self.hte_features = ["feature_" + str(i) for i in range(5)]
-        elif mode == 5:
-            self.hte_features = ["feature_" + str(i) for i in range(p)]
 
         self.rest_features = [
             f for f in self.feature_names if f not in self.hte_features
@@ -132,12 +138,9 @@ class Data:
 
         self.feature_names = list(df.columns[0:12])
 
-        # self.hte_features = self.feature_names
-
-        if self.mode == 71:
+        if self.mode == "CU-visit":
             df.rename(columns={"visit": "outcome"}, inplace=True)
             self.hte_features = ["f0", "f2", "f3", "f6", "f8", "f9"]
-
         else:
             df.rename(columns={"conversion": "outcome"}, inplace=True)
             self.hte_features = ["f2", "f3", "f4", "f6", "f8", "f9", "f10", "f11"]
@@ -199,6 +202,8 @@ class Data:
                 features = self.feature_names
             elif features_in_P == "hte_only":
                 features = self.hte_features
+            elif isinstance(features_in_P, list):
+                features = features_in_P
             else:
                 features = self.rest_features
 
