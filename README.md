@@ -51,13 +51,13 @@ from trees.data import Data
 D = Data()
 D.generate(n=10000, mode="RCT") # use mode to change the dataset
 
-alg = CFT() # CATE estimator
-alg.fit(D=D)
+CATE_estimator = CFT()
+CATE_estimator.fit(D=D)
 D.user_condition("feature_0>1") # the user query
-alg.online()
+CATE_estimator.online()
 
-topk = DiRe(alg=alg) # top-K algorithm
-top = topk.get_topK(k=5)
-print(top['combined']) # print the top-K subgroups
-# print(top['final_condition']) # print the full conditions of the top-K subgroups
+topk = DiRe(alg=CATE_estimator) # top-K algorithm
+subgroups = topk.get_topK(k=5)
+print(subgroups['combined']) # print the top-K subgroups
+# print(subgroups['final_condition']) # print the full conditions of the top-K subgroups
 ```
