@@ -22,7 +22,7 @@ Evaluate the relative performance of each top-K algorithm against the exhaustive
 
 Varying the number of subgroup recommendations K, and evaluating the performance of each top-K algorithm.
 
-### [Feature Importance and Inclusion](./experiments/missing_HTE_Feature.ipynb)
+### [Feature Importance and Inclusion](./experiments/missing_HTE_feature.ipynb)
 
 Examine the framework's behavior on the UTC dataset, when the CATE model is trained on:
 
