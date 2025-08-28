@@ -182,7 +182,9 @@ class CFT(CF):
             self.D.feature_names if train_in_all_features else self.D.hte_features
         )
 
-        model = f"../models/CFT_{self.D.mode}.pkl"
+        model = os.path.join(
+            os.path.dirname(__file__), "..", "models", f"CFT_{self.D.mode}.pkl"
+        )
 
         if params.CF.USE_PRETRAINED and os.path.exists(model):
             final_tree = joblib.load(model)

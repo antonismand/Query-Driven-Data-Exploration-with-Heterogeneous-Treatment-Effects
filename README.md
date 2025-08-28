@@ -37,3 +37,27 @@ Evaluate the scalability of each top-K algorithm on larger datasets (1M-30M).
 ### [Parameter Tuning of Top-K Algorithms](./experiments/topk_params.ipynb)
 
 Evaluate the performance of top-K algorithms under different parameter settings.
+
+### Running the code
+
+> poetry install
+
+```python
+from trees.causal_tree import CT, CTP
+from trees.causal_forest import CFT
+from trees.topk import *
+from trees.data import Data
+
+D = Data()
+D.generate(n=10000, mode="RCT") # use mode to change the dataset
+
+alg = CFT() # CATE estimator
+alg.fit(D=D)
+D.user_condition("feature_0>1") # the user query
+alg.online()
+
+topk = DiRe(alg=alg) # top-K algorithm
+top = topk.get_topK(k=5)
+print(top['combined']) # print the top-K subgroups
+# print(top['final_condition']) # print the full conditions of the top-K subgroups
+```
