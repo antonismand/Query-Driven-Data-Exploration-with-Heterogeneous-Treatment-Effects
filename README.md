@@ -48,15 +48,21 @@ from trees.causal_forest import CFT
 from trees.topk import *
 from trees.data import Data
 
+# Offline phase
+# Generate synthetic data or use a real dataset
 D = Data()
 D.generate(n=10000, mode="RCT") # use mode to change the dataset
 
+# Fit a CATE estimator
 CATE_estimator = CFT()
 CATE_estimator.fit(D=D)
+
+# Online phase
 D.user_condition("feature_0>1") # the user query
 CATE_estimator.online()
 
-topk = DiRe(alg=CATE_estimator) # top-K algorithm
+# run the top-K algorithm
+topk = DiRe(alg=CATE_estimator) # top-K algorithms: [LoRe, DiRe, DiCoR, ReCoD]
 subgroups = topk.get_topK(k=5)
 print(subgroups['combined']) # print the top-K subgroups
 # print(subgroups['final_condition']) # print the full conditions of the top-K subgroups
