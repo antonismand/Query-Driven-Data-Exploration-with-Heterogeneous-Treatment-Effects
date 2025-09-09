@@ -71,17 +71,16 @@ class Experiment:
             for exp in range(data_iterations):
                 data = Data()
                 param_dict["seed"] = exp
-                if param_dict["mode"] in (1, 2, 3, 4, 5):
+                if param_dict["mode"] in ("RCT", "UTC"):
                     logger.info("Generating data: {}", param_dict)
                 data.generate(**param_dict)
 
-                if "mode" in param_dict and param_dict["mode"] == 6:
+                if "mode" in param_dict and param_dict["mode"] == "OTC":
+                    cts = [LinearIV()]
 
-                    cate_models = [
-                        LinearIV
-                    ]  # be careful it overrides the default param
+                else:
+                    cts = [ct() for ct in cate_models]
 
-                cts = [ct() for ct in cate_models]
                 for ct in cts:
                     start = time()
                     ct.fit(D=data)
@@ -99,7 +98,7 @@ class Experiment:
                             condition_dict,
                         )
 
-                        data.generate_random_condition(**condition_dict)
+                        cond, s = data.generate_random_condition(**condition_dict)
 
                         for ct in cts:
                             # logger.info(f"{ct.algorithm} running")
@@ -125,6 +124,10 @@ class Experiment:
                                         **condition_dict,
                                         **topK_dict,
                                     }
+                                    score["iteration"] = j
+                                    score["Q"] = cond
+                                    score["Q_selectivity"] = s
+                                    score["dataset"] = param_dict.get("mode", "")
                                     if var_name in current_combination:
                                         score[var_name] = current_combination[var_name]
                                     self.scores = pd.concat(

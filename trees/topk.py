@@ -402,15 +402,16 @@ class ExhaustiveDiRe(TopK):
 
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
         valid_subs = [s for s in subs if self.is_valid(s)]
-        self.max_t = self.get_t(valid_subs[0])
+        logger.debug(
+            f"{self.name} - Valid subgroups: {len(valid_subs)} out of {len(subs)}"
+        )
+        if not self.check_n_subs(valid_subs):
+            return []
 
-        logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
+        self.max_t = self.get_t(valid_subs[0])
         valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
 
-        for candidates in tqdm(
-            itertools.combinations(valid_subs, self.k),
-            total=comb(len(valid_subs), self.k),
-        ):
+        for candidates in itertools.combinations(valid_subs, self.k):
             score, _, _ = self.get_scores_for_subs(candidates)
             if score > best_score:
                 logger.debug(f"NEW score:{score} previous: {best_score}")
@@ -436,13 +437,15 @@ class ExhaustiveDiCoR(TopK):
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
         valid_subs = [s for s in subs if self.is_valid(s)]
 
-        logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
+        logger.debug(
+            f"{self.name} - Valid subgroups: {len(valid_subs)} out of {len(subs)}"
+        )
+        if not self.check_n_subs(valid_subs):
+            return []
+
         valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
 
-        for candidates in tqdm(
-            itertools.combinations(valid_subs, self.k),
-            total=comb(len(valid_subs), self.k),
-        ):
+        for candidates in itertools.combinations(valid_subs, self.k):
             if self.get_diversity(candidates) > self.min_diversity:
                 cate = sum([self.get_t(c) for c in candidates])
                 if cate > best_cate:
@@ -465,13 +468,15 @@ class ExhaustiveReCoD(TopK):
         subs = sorted(self.ct.subgroups, key=lambda x: self.get_t(x), reverse=True)
         valid_subs = [s for s in subs if self.is_valid(s)]
 
-        logger.info(f"Valid subgroups: {len(valid_subs)} out of {len(subs)}")
+        logger.debug(
+            f"{self.name} - Valid subgroups: {len(valid_subs)} out of {len(subs)}"
+        )
+        if not self.check_n_subs(valid_subs):
+            return []
+
         valid_subs = valid_subs[0 : params.TOPK.EXHAUSTIVE_TOPK]
 
-        for candidates in tqdm(
-            itertools.combinations(valid_subs, self.k),
-            total=comb(len(valid_subs), self.k),
-        ):
+        for candidates in itertools.combinations(valid_subs, self.k):
             diversity = self.get_diversity(candidates)
 
             if diversity > best_diversity:
