@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite our paper."
+title: "Query-Driven Data Exploration with Heterogeneous Treatment Effects"
+authors:
+  - family-names: Mandamadiotis
+    given-names: Antonis
+  - family-names: Amer-Yahia
+    given-names: Sihem
+  - family-names: Koutrika
+    given-names: Georgia
+preferred-citation:
+  type: conference-paper
+  title: "Query-Driven Data Exploration with Heterogeneous Treatment Effects"
+  authors:
+    - family-names: Mandamadiotis
+      given-names: Antonis
+    - family-names: Amer-Yahia
+      given-names: Sihem
+    - family-names: Koutrika
+      given-names: Georgia
+  collection-title: "2026 IEEE 42nd International Conference on Data Engineering (ICDE)"
+  year: 2026
+  start: 753
+  end: 765
+  doi: "10.1109/ICDE65706.2026.00062"
+  month: 5
+  issn: "2375-026X"
+  publisher:
+    name: IEEE

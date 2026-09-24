@@ -67,3 +67,23 @@ subgroups = topk.get_topK(k=5)
 print(subgroups['combined']) # print the top-K subgroups
 # print(subgroups['final_condition']) # print the full conditions of the top-K subgroups
 ```
+
+## Citation
+
+If you use this code, please cite our paper:
+
+```bibtex
+@INPROCEEDINGS{11629194,
+  author={Mandamadiotis, Antonis and Amer-Yahia, Sihem and Koutrika, Georgia},
+  booktitle={2026 IEEE 42nd International Conference on Data Engineering (ICDE)},
+  title={Query-Driven Data Exploration with Heterogeneous Treatment Effects},
+  year={2026},
+  volume={},
+  number={},
+  pages={753-765},
+  abstract={Understanding how changes in actions or policies impact different population segments (users, items, etc.) is central to data-driven decision-making, but it is time-consuming and labor-intensive. We introduce a novel framework that combines user-defined search areas with causal inference to automatically identify responsive subgroups, i.e., subgroups most likely to benefit from a specific action or intervention, by estimating the impact of interventions, while also promoting subgroup diversity to ensure broad and representative insights. To support this, we develop a formal problem definition and an efficient search strategy to navigate the large combinatorial space of possible subgroups. We propose efficient algorithms that use pretrained causal effect estimators to dynamically surface the top- $K$ subgroups. Experiments across multiple datasets and estimation techniques demonstrate the scalability and effectiveness of our framework for large-scale analysis.},
+  keywords={Trees (botanical);Vegetation;Algorithms;Modeling;Printing;Forests;Timing;Training;Equations;Estimation;subgroup identification;causal inference;recommendations},
+  doi={10.1109/ICDE65706.2026.00062},
+  ISSN={2375-026X},
+  month={May},}
+```
